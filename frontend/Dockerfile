@@ -1,3 +1,12 @@
+# ── Development stage ───────────────────────────────────────────────────────
+FROM node:20-alpine AS dev
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
@@ -10,6 +19,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Required for Railway (and any reverse-proxy host): bind to all interfaces, not just loopback
+ENV HOSTNAME=0.0.0.0
 # next.config.ts output: 'standalone' copies only what's needed
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
