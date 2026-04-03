@@ -1,11 +1,18 @@
-FROM node:20-alpine AS base
-
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-# Use npm install (not npm ci) to handle any lock file drift
 RUN npm install
 COPY . .
+RUN npm run build
 
+# ── Production stage ─────────────────────────────────────────────────────────
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+# next.config.ts output: 'standalone' copies only what's needed
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 EXPOSE 3000
-
-CMD ["npm", "run", "dev"]
+CMD ["node", "server.js"]
