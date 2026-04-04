@@ -72,7 +72,7 @@ export default function BrowsePage() {
     const qs = new URLSearchParams();
     if (leagueIds) qs.set("leagues", leagueIds);
     if (teamIds) qs.set("teams", teamIds);
-    router.push(`/build?${qs.toString()}`);
+    router.push(`/get-calendar?${qs.toString()}`);
   }
 
   const filtered = leagues.filter((l) =>

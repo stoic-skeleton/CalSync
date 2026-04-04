@@ -10,7 +10,7 @@ import ThemeToggle from "./theme-toggle";
 const NAV_LINKS = [
   { href: "/browse", label: "Browse" },
   { href: "/schedule", label: "Schedule" },
-  { href: "/build", label: "Get Calendar" },
+  { href: "/get-calendar", label: "Get Calendar" },
 ];
 
 export default function Navbar() {
