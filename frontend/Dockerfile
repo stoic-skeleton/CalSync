@@ -15,15 +15,15 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# ── Production stage ─────────────────────────────────────────────────────────
+# ── Production stage (used if deploying frontend via Docker, e.g. Railway) ────
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-# Required for Railway (and any reverse-proxy host): bind to all interfaces, not just loopback
+# Bind to all interfaces for reverse-proxy hosts
 ENV HOSTNAME=0.0.0.0
-# next.config.ts output: 'standalone' copies only what's needed
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["npm", "start"]

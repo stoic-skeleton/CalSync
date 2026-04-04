@@ -13,6 +13,7 @@ CalSync lets you subscribe to sports schedules (F1, IPL, NFL, NBA, MLS) directly
 | [docs/data-pipeline.md](docs/data-pipeline.md) | Adapter pattern, ingest logic, `.ics` generation, adding leagues |
 | [docs/errors-and-fixes.md](docs/errors-and-fixes.md) | Every significant error encountered and how it was fixed |
 | [docs/development.md](docs/development.md) | Setup, Docker commands, DB queries, project conventions |
+| [docs/deployment-railway-vercel.md](docs/deployment-railway-vercel.md) | Step-by-step: backend on Railway, frontend on Vercel |
 
 ## Quick Start
 
