@@ -73,9 +73,4 @@ app.include_router(feeds.router)
 
 @app.get("/api/health")
 def health():
-    return {
-        "status": "ok",
-        "environment": settings.environment,
-        "cors_origins": settings.cors_origins_list,
-        "api_base_url": settings.api_base_url,
-    }
+    return {"status": "ok", "environment": settings.environment}
