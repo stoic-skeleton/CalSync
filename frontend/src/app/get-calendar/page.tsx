@@ -56,14 +56,9 @@ function BuildPageInner() {
     try {
       const result = await createFeed({ league_ids: leagueIds, team_ids: teamIds });
       setFeed(result);
-    } catch {
-      // Backend not running — show a mock feed for demo
-      setFeed({
-        feed_hash: "demo-feed-abc123",
-        feed_url: `${window.location.origin}/cal/demo-feed-abc123.ics`,
-        webcal_url: `webcal://${window.location.host}/cal/demo-feed-abc123.ics`,
-        event_count: selectedLeagues.reduce((n, l) => n + l.event_count, 0),
-      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Could not reach backend: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -171,7 +166,10 @@ function BuildPageInner() {
         )}
 
         {error && (
-          <p className="mt-4 text-center text-sm text-red-400">{error}</p>
+          <div className="mt-4 rounded-xl p-4 text-sm" style={{ background: "var(--surface)", color: "var(--muted)" }}>
+            <p className="text-red-400 font-mono mb-1">{error}</p>
+            <p className="font-mono text-xs">API URL: {process.env.NEXT_PUBLIC_API_URL ?? "(not set — using localhost fallback)"}</p>
+          </div>
         )}
 
         {/* How it works reminder */}
