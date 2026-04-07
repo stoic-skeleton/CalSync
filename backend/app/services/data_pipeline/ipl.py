@@ -21,19 +21,19 @@ CRICAPI_BASE = "https://api.cricapi.com/v1"
 CRICAPI_KEY = os.environ.get("CRICAPI_KEY", "")
 IPL_SERIES_ID = "87c62aac-bc3c-4738-ab93-19da0690488f"  # Indian Premier League 2026
 
-# Static team data — CricAPI match list doesn't include logos; these come from TheSportsDB
-# keyed by the short team name fragment for fuzzy matching
+# Static team logos sourced from TheSportsDB (verified April 2026)
+# Key must match a substring of the team name returned by CricAPI
 _TEAM_LOGOS: dict[str, str] = {
     "Mumbai Indians":            "https://r2.thesportsdb.com/images/media/team/badge/l40j8p1487678631.png",
-    "Chennai Super Kings":       "https://r2.thesportsdb.com/images/media/team/badge/uvkxlp1487678903.png",
+    "Chennai Super Kings":       "https://r2.thesportsdb.com/images/media/team/badge/okceh51487601098.png",
     "Royal Challengers":         "https://r2.thesportsdb.com/images/media/team/badge/kynj5v1588331757.png",
     "Kolkata Knight Riders":     "https://r2.thesportsdb.com/images/media/team/badge/ows99r1487678296.png",
-    "Delhi Capitals":            "https://r2.thesportsdb.com/images/media/team/badge/vrqxx11556614803.png",
-    "Punjab Kings":              "https://r2.thesportsdb.com/images/media/team/badge/qnb96y1487678506.png",
-    "Rajasthan Royals":          "https://r2.thesportsdb.com/images/media/team/badge/52tr8x1487419048.png",
+    "Delhi Capitals":            "https://r2.thesportsdb.com/images/media/team/badge/dg4g0z1587334054.png",
+    "Punjab Kings":              "https://r2.thesportsdb.com/images/media/team/badge/r1tcie1630697821.png",
+    "Rajasthan Royals":          "https://r2.thesportsdb.com/images/media/team/badge/lehnfw1487601864.png",
     "Sunrisers Hyderabad":       "https://r2.thesportsdb.com/images/media/team/badge/sc7m161487419327.png",
-    "Lucknow Super Giants":      "https://r2.thesportsdb.com/images/media/team/badge/cxvwrp1649322327.png",
-    "Gujarat Titans":            "https://r2.thesportsdb.com/images/media/team/badge/6r2wsp1649480282.png",
+    "Lucknow Super Giants":      "https://r2.thesportsdb.com/images/media/team/badge/4tzmfa1647445839.png",
+    "Gujarat Titans":            "https://r2.thesportsdb.com/images/media/team/badge/6qw4r71654174508.png",
 }
 
 
