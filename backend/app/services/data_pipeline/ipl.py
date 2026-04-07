@@ -1,103 +1,128 @@
 """
-IPL adapter — uses TheSportsDB free API.
-Notes:
- - lookup_all_teams and eventsnextleague endpoints IGNORE the id param on the free key "3"
-   and return random data. The eventsseason endpoint works correctly.
- - Teams are extracted from the events payload (each event carries team id, name, badge).
+IPL adapter — uses CricAPI (cricapi.com).
+Docs: https://cricapi.com/cricapi/apis/
+Endpoints used:
+  GET https://api.cricapi.com/v1/series_info?apikey=KEY&id=SERIES_ID
+    — returns full match list for the IPL series (70 matches for 2026)
+
+TheSportsDB was the previous source but only had ~15 fixtures available
+(they add incrementally). CricAPI has the full fixture list from day one.
+
+Series IDs (update each year by querying /v1/series and searching "Indian Premier League"):
+  2026: 87c62aac-bc3c-4738-ab93-19da0690488f
 """
+import os
 from datetime import datetime, timezone
 import httpx
 from app.services.data_pipeline.base import SportAdapter, RawEvent, RawTeam
 
-BASE = "https://www.thesportsdb.com/api/v1/json/3"
-# Confirmed via search_all_leagues: idLeague 4460 = Indian Premier League (Cricket)
-IPL_LEAGUE_ID = "4460"
-# Fetch both current and next season to maximise coverage;
-# TheSportsDB adds fixtures incrementally so fetching two seasons catches more data.
-IPL_SEASONS = ["2026", "2025"]
+CRICAPI_BASE = "https://api.cricapi.com/v1"
+# Read from env so the key is not hardcoded in source — set CRICAPI_KEY in Railway variables
+CRICAPI_KEY = os.environ.get("CRICAPI_KEY", "")
+IPL_SERIES_ID = "87c62aac-bc3c-4738-ab93-19da0690488f"  # Indian Premier League 2026
+
+# Static team data — CricAPI match list doesn't include logos; these come from TheSportsDB
+# keyed by the short team name fragment for fuzzy matching
+_TEAM_LOGOS: dict[str, str] = {
+    "Mumbai Indians":            "https://r2.thesportsdb.com/images/media/team/badge/l40j8p1487678631.png",
+    "Chennai Super Kings":       "https://r2.thesportsdb.com/images/media/team/badge/uvkxlp1487678903.png",
+    "Royal Challengers":         "https://r2.thesportsdb.com/images/media/team/badge/kynj5v1588331757.png",
+    "Kolkata Knight Riders":     "https://r2.thesportsdb.com/images/media/team/badge/ows99r1487678296.png",
+    "Delhi Capitals":            "https://r2.thesportsdb.com/images/media/team/badge/vrqxx11556614803.png",
+    "Punjab Kings":              "https://r2.thesportsdb.com/images/media/team/badge/qnb96y1487678506.png",
+    "Rajasthan Royals":          "https://r2.thesportsdb.com/images/media/team/badge/52tr8x1487419048.png",
+    "Sunrisers Hyderabad":       "https://r2.thesportsdb.com/images/media/team/badge/sc7m161487419327.png",
+    "Lucknow Super Giants":      "https://r2.thesportsdb.com/images/media/team/badge/cxvwrp1649322327.png",
+    "Gujarat Titans":            "https://r2.thesportsdb.com/images/media/team/badge/6r2wsp1649480282.png",
+}
+
+
+def _logo_for(team_name: str) -> str | None:
+    for key, url in _TEAM_LOGOS.items():
+        if key.lower() in team_name.lower():
+            return url
+    return None
 
 
 class IPLAdapter(SportAdapter):
     league_slug = "ipl"
 
-    async def _fetch_season_events(self) -> list[dict]:
-        """Fetch from multiple seasons and deduplicate by idEvent."""
-        seen_ids: set[str] = set()
-        all_events: list[dict] = []
-        async with httpx.AsyncClient(timeout=15) as client:
-            for season in IPL_SEASONS:
-                url = f"{BASE}/eventsseason.php?id={IPL_LEAGUE_ID}&s={season}"
-                try:
-                    res = await client.get(url)
-                    res.raise_for_status()
-                    for ev in (res.json().get("events") or []):
-                        eid = ev.get("idEvent")
-                        if eid and eid not in seen_ids:
-                            seen_ids.add(eid)
-                            all_events.append(ev)
-                except Exception:
-                    continue
-        return all_events
+    async def _fetch_match_list(self) -> list[dict]:
+        if not CRICAPI_KEY:
+            return []
+        url = f"{CRICAPI_BASE}/series_info?apikey={CRICAPI_KEY}&id={IPL_SERIES_ID}"
+        async with httpx.AsyncClient(timeout=20) as client:
+            res = await client.get(url)
+            res.raise_for_status()
+        data = res.json()
+        return data.get("data", {}).get("matchList", [])
 
     async def fetch_teams(self) -> list[RawTeam]:
-        """Extract unique teams from the events data — avoids the broken lookup_all_teams endpoint."""
-        events_data = await self._fetch_season_events()
+        matches = await self._fetch_match_list()
         seen: dict[str, RawTeam] = {}
-        for ev in events_data:
-            for id_key, name_key, badge_key in [
-                ("idHomeTeam", "strHomeTeam", "strHomeTeamBadge"),
-                ("idAwayTeam", "strAwayTeam", "strAwayTeamBadge"),
-            ]:
-                tid = ev.get(id_key)
-                name = ev.get(name_key)
-                if tid and name and tid not in seen:
-                    seen[tid] = RawTeam(
-                        external_id=tid,
-                        name=name,
-                        short_name=None,
-                        logo_url=ev.get(badge_key) or None,
+        for m in matches:
+            # name format: "Team A vs Team B, Nth Match, Indian Premier League 2026"
+            parts = m.get("name", "").split(",")[0].split(" vs ")
+            for team_name in parts:
+                team_name = team_name.strip()
+                # Use lowercase name as key to deduplicate
+                key = team_name.lower()
+                if key and key not in seen:
+                    seen[key] = RawTeam(
+                        external_id=f"ipl-{key.replace(' ', '-')}",
+                        name=team_name,
+                        logo_url=_logo_for(team_name),
                     )
         return list(seen.values())
 
     async def fetch_events(self) -> list[RawEvent]:
-        events_data = await self._fetch_season_events()
+        matches = await self._fetch_match_list()
         events: list[RawEvent] = []
 
-        for ev in events_data:
-            date_str = ev.get("dateEvent", "")
-            time_str = ev.get("strTime", "00:00:00") or "00:00:00"
+        for m in matches:
+            match_id = m.get("id")
+            if not match_id:
+                continue
+
+            # dateTimeGMT is "2026-04-11T14:00:00" — treat as UTC
+            dt_str = m.get("dateTimeGMT") or m.get("date")
+            if not dt_str:
+                continue
             try:
-                start = datetime.fromisoformat(f"{date_str}T{time_str}").replace(tzinfo=timezone.utc)
+                # dateTimeGMT has no timezone suffix — it is UTC
+                start = datetime.fromisoformat(dt_str).replace(tzinfo=timezone.utc)
             except ValueError:
                 continue
 
-            # Skip events that are already in the past
-            # (keep them — ingest.py handles status; let the DB decide what's upcoming)
+            # Parse team names from match name
+            name_part = m.get("name", "").split(",")[0]  # "Team A vs Team B"
+            teams = name_part.split(" vs ")
+            home_name = teams[0].strip() if len(teams) > 0 else ""
+            away_name = teams[1].strip() if len(teams) > 1 else ""
+            home_ext_id = f"ipl-{home_name.lower().replace(' ', '-')}" if home_name else None
+            away_ext_id = f"ipl-{away_name.lower().replace(' ', '-')}" if away_name else None
 
-            score = None
-            hs = ev.get("intHomeScore")
-            as_ = ev.get("intAwayScore")
-            if hs is not None and as_ is not None:
-                score = f"{hs}-{as_}"
-
-            postponed = (ev.get("strPostponed") or "").lower() == "yes"
-            has_score = hs is not None and as_ is not None
-            status = "postponed" if postponed else ("completed" if has_score else "scheduled")
+            status_str = (m.get("status") or "").lower()
+            if "won" in status_str or "result" in status_str or "match tied" in status_str:
+                status = "completed"
+            elif "rain" in status_str or "abandon" in status_str or "cancel" in status_str:
+                status = "cancelled"
+            else:
+                status = "scheduled"
 
             events.append(
                 RawEvent(
-                    external_id=ev["idEvent"],
-                    title=ev.get("strEvent", ""),
+                    external_id=f"cricapi-{match_id}",
+                    title=f"{home_name} vs {away_name}" if home_name else m.get("name", ""),
                     event_type="match",
                     start_time=start,
-                    venue=ev.get("strVenue"),
-                    city=ev.get("strCity"),
-                    home_team_external_id=ev.get("idHomeTeam"),
-                    away_team_external_id=ev.get("idAwayTeam"),
+                    venue=m.get("venue"),
+                    home_team_external_id=home_ext_id,
+                    away_team_external_id=away_ext_id,
                     status=status,
-                    score=score,
-                    broadcast_info=ev.get("strTVStation"),
+                    description="Indian Premier League 2026",
                 )
             )
+
         return events
 
