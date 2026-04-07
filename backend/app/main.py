@@ -54,9 +54,12 @@ app = FastAPI(
 )
 
 # CORS
+# allow_origin_regex covers all Vercel preview deployments (*.vercel.app)
+# allow_origins covers exact origins set via CORS_ORIGINS env var
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,4 +73,9 @@ app.include_router(feeds.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "environment": settings.environment}
+    return {
+        "status": "ok",
+        "environment": settings.environment,
+        "cors_origins": settings.cors_origins_list,
+        "api_base_url": settings.api_base_url,
+    }
