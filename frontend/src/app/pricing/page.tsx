@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { Check, X, Zap, Users, CalendarDays } from "lucide-react";
 
+export const metadata = {
+  title: "Pricing — CalSync",
+  description: "Simple, transparent pricing for CalSync. Start free and upgrade for more leagues and faster refresh rates.",
+};
+
 const PLANS = [
   {
     name: "Free",
@@ -95,8 +100,21 @@ const FAQ = [
 ];
 
 export default function PricingPage() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  };
   return (
     <div className="flex flex-col flex-1" style={{ background: "var(--background)" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       {/* ── Header ── */}
       <section className="relative overflow-hidden px-4 pt-20 pb-16 text-center">
         <div

@@ -31,13 +31,42 @@ export const metadata: Metadata = {
     description: "Sports schedules synced to your calendar.",
     siteName: "CalSync",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "CalSync — Never Miss a Game",
+    description:
+      "Sync your favourite sports schedules — F1, IPL, NFL, NBA, MLS — directly into Google Calendar, Apple Calendar, or Outlook.",
+  },
 };
+
+export const metadataBase = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cal-sync.app");
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://cal-sync.app";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "CalSync",
+        "url": siteUrl,
+      },
+      {
+        "@type": "WebSite",
+        "name": "CalSync",
+        "url": siteUrl,
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": `${siteUrl}/browse?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
   return (
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
@@ -51,6 +80,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <Navbar />
         <main className="flex-1 flex flex-col">{children}</main>
         <Footer />

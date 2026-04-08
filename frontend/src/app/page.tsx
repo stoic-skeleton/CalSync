@@ -2,6 +2,12 @@ import Link from "next/link";
 import { CalendarDays, Zap, RefreshCw, Globe, Tv, Star } from "lucide-react";
 import { LogoImage } from "@/components/sport-filter";
 
+export const metadata = {
+  title: "CalSync — Sync Sports Schedules to Your Calendar",
+  description:
+    "Never miss a game. Sync F1, IPL, NFL, NBA & Premier League schedules into Google Calendar, Apple Calendar, or Outlook. Free, auto-updating .ics feeds.",
+};
+
 // ── Leagues shown on home page ────────────────────────────────────────────
 const LEAGUES = [
   { name: "Formula 1",  logo_url: "https://a.espncdn.com/i/teamlogos/leagues/500/f1.png",    emoji: "🏎️", color: "#e10600", events: "24 races",   sport: "Motorsport",        country: "Global" },
