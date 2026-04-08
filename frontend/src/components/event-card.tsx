@@ -78,7 +78,15 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
             <div className="flex flex-wrap gap-3 mt-2">
               <MetaTag icon={<Clock size={12} />} label={formatEventTime(event.start_time)} />
               {event.venue && <MetaTag icon={<MapPin size={12} />} label={`${event.venue}${event.city ? ` · ${event.city}` : ""}`} />}
-              {event.broadcast_info && <MetaTag icon={<Tv size={12} />} label={event.broadcast_info} />}
+              {event.broadcast_info && (
+                <span
+                  className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(245,158,11,0.12)", color: "#d97706" }}
+                >
+                  <Tv size={11} />
+                  Watch on {event.broadcast_info}
+                </span>
+              )}
             </div>
           )}
 

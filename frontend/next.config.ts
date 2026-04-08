@@ -15,6 +15,8 @@ const nextConfig: NextConfig = {
       // Jolpica / Formula 1 logos if ever added
       { protocol: "https", hostname: "**.jolpica.com" },
       { protocol: "https", hostname: "**.formula1.com" },
+      // Clearbit Logo API (league + calendar app logos on homepage)
+      { protocol: "https", hostname: "logo.clearbit.com" },
     ],
   },
 };

@@ -5,6 +5,7 @@ const LINKS = [
   { group: "Product", items: [
     { label: "Browse Calendars", href: "/browse" },
     { label: "Upcoming Schedule", href: "/schedule" },
+    { label: "Pricing", href: "/pricing" },
     { label: "Get Calendar Link", href: "/get-calendar" },
   ]},
   { group: "Sports", items: [

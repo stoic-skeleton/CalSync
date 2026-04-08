@@ -2,16 +2,30 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, Globe } from "lucide-react";
 import SportFilter, { SelectionBar } from "@/components/sport-filter";
 import LeagueCard from "@/components/league-card";
 import TeamCard from "@/components/team-card";
 import { fetchLeagues, fetchLeague } from "@/lib/api";
 import type { League, Team } from "@/lib/types";
 
+// Map country strings → display region group
+function toRegion(country: string | null): string {
+  if (!country) return "Global";
+  const c = country.toLowerCase();
+  if (c.includes("international") || c.includes("global") || c === "international") return "Global";
+  if (c.includes("india")) return "India";
+  if (c.includes("usa") || c.includes("canada") || c.includes("united states")) return "North America";
+  if (c.includes("uk") || c.includes("england") || c.includes("united kingdom")) return "United Kingdom";
+  if (c.includes("europe") || c.includes("spain") || c.includes("germany") || c.includes("france") || c.includes("italy")) return "Europe";
+  if (c.includes("australia")) return "Australia";
+  return country;
+}
+
 export default function BrowsePage() {
   const router = useRouter();
   const [sport, setSport] = useState("");
+  const [region, setRegion] = useState("");
   const [search, setSearch] = useState("");
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,24 +89,34 @@ export default function BrowsePage() {
     router.push(`/get-calendar?${qs.toString()}`);
   }
 
-  const filtered = leagues.filter((l) =>
-    search
-      ? l.name.toLowerCase().includes(search.toLowerCase())
-      : true
-  );
+  const sourceLeagues: League[] =
+    leagues.length > 0 ? leagues : PLACEHOLDER_LEAGUES;
+
+  // Build filtered list
+  const filtered = sourceLeagues.filter((l) => {
+    const matchesSport = !sport || l.sport_type === sport;
+    const matchesRegion = !region || toRegion(l.country) === region;
+    const matchesSearch = !search || l.name.toLowerCase().includes(search.toLowerCase());
+    return matchesSport && matchesRegion && matchesSearch;
+  });
+
+  // Available regions from the current sport-filtered list
+  const allRegions = Array.from(
+    new Set(sourceLeagues
+      .filter((l) => !sport || l.sport_type === sport)
+      .map((l) => toRegion(l.country))
+    )
+  ).sort();
 
   const totalSelected = selectedLeagues.length + selectedTeams.length;
 
-  // Placeholder leagues when backend is not connected
-  const displayLeagues: League[] =
-    filtered.length > 0
-      ? filtered
-      : loading
-      ? []
-      : PLACEHOLDER_LEAGUES.filter(
-          (l) => (!sport || l.sport_type === sport) &&
-                 (!search || l.name.toLowerCase().includes(search.toLowerCase()))
-        );
+  // Group filtered leagues by region for display
+  const grouped: Record<string, League[]> = {};
+  for (const l of filtered) {
+    const r = toRegion(l.country);
+    (grouped[r] ??= []).push(l);
+  }
+  const groupOrder = Object.keys(grouped).sort();
 
   return (
     <div
@@ -109,13 +133,49 @@ export default function BrowsePage() {
             Browse Sports
           </h1>
           <p className="text-sm" style={{ color: "var(--muted)" }}>
-            Select leagues or individual teams to include in your calendar feed.
+            Filter by sport, country, or search. Select leagues or individual teams.
           </p>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col gap-4 mb-8">
-          <SportFilter value={sport} onChange={setSport} />
+        <div className="flex flex-col gap-3 mb-8">
+          {/* Sport filter */}
+          <SportFilter value={sport} onChange={(v) => { setSport(v); setRegion(""); }} />
+
+          {/* Region filter pills */}
+          {allRegions.length > 1 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="flex items-center gap-1 text-xs font-medium" style={{ color: "var(--muted)" }}>
+                <Globe size={12} /> Region:
+              </span>
+              <button
+                onClick={() => setRegion("")}
+                className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all"
+                style={
+                  region === ""
+                    ? { background: "var(--foreground)", color: "var(--background)" }
+                    : { background: "var(--surface)", border: "1px solid var(--border)", color: "var(--muted)" }
+                }
+              >
+                All
+              </button>
+              {allRegions.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRegion(r === region ? "" : r)}
+                  className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all"
+                  style={
+                    region === r
+                      ? { background: "var(--foreground)", color: "var(--background)" }
+                      : { background: "var(--surface)", border: "1px solid var(--border)", color: "var(--muted)" }
+                  }
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative max-w-xs">
             <Search
@@ -138,7 +198,7 @@ export default function BrowsePage() {
           </div>
         </div>
 
-        {/* League grid */}
+        {/* League grid — grouped by region */}
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -149,57 +209,82 @@ export default function BrowsePage() {
               />
             ))}
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16" style={{ color: "var(--muted)" }}>
+            <p className="text-4xl mb-3">🔍</p>
+            <p className="font-medium">No leagues found</p>
+            <p className="text-sm mt-1">Try a different sport or region filter.</p>
+          </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {displayLeagues.map((league) => {
-              const isSelected = !!selectedLeagues.find((l) => l.id === league.id);
-              const isExpanded = expandedLeague?.id === league.id;
-              return (
-                <div key={league.id} className="flex flex-col gap-2">
-                  <div onClick={() => handleExpandLeague(league)} className="cursor-pointer">
-                    <LeagueCard
-                      league={league}
-                      selected={isSelected}
-                      onToggle={toggleLeague}
-                    />
+          <div className="flex flex-col gap-10">
+            {groupOrder.map((grp) => (
+              <div key={grp}>
+                {/* Region heading — only shown when multiple groups visible */}
+                {groupOrder.length > 1 && (
+                  <div className="flex items-center gap-3 mb-4">
+                    <Globe size={14} style={{ color: "var(--muted)" }} />
+                    <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--muted)" }}>
+                      {grp}
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+                    <span className="text-xs" style={{ color: "var(--muted)" }}>
+                      {grouped[grp].length} {grouped[grp].length === 1 ? "league" : "leagues"}
+                    </span>
                   </div>
-
-                  {/* Teams panel under league */}
-                  {isExpanded && (
-                    <div
-                      className="rounded-xl p-3 flex flex-col gap-2"
-                      style={{
-                        background: "var(--surface)",
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <p
-                        className="text-xs font-semibold mb-1"
-                        style={{ color: "var(--muted)" }}
-                      >
-                        Teams — pick individual teams or add whole league above
-                      </p>
-                      {teamsLoading ? (
-                        <div className="h-8 rounded animate-pulse" style={{ background: "var(--surface-hover)" }} />
-                      ) : expandedLeague?.teams.length ? (
-                        expandedLeague.teams.map((team) => (
-                          <TeamCard
-                            key={team.id}
-                            team={team}
-                            selected={!!selectedTeams.find((t) => t.id === team.id)}
-                            onToggle={toggleTeam}
+                )}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {grouped[grp].map((league) => {
+                    const isSelected = !!selectedLeagues.find((l) => l.id === league.id);
+                    const isExpanded = expandedLeague?.id === league.id;
+                    return (
+                      <div key={league.id} className="flex flex-col gap-2">
+                        <div onClick={() => handleExpandLeague(league)} className="cursor-pointer">
+                          <LeagueCard
+                            league={league}
+                            selected={isSelected}
+                            onToggle={toggleLeague}
                           />
-                        ))
-                      ) : (
-                        <p className="text-xs" style={{ color: "var(--muted)" }}>
-                          No teams data yet.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                        </div>
+
+                        {/* Teams panel */}
+                        {isExpanded && (
+                          <div
+                            className="rounded-xl p-3 flex flex-col gap-2"
+                            style={{
+                              background: "var(--surface)",
+                              border: "1px solid var(--border)",
+                            }}
+                          >
+                            <p
+                              className="text-xs font-semibold mb-1"
+                              style={{ color: "var(--muted)" }}
+                            >
+                              Teams — pick individual teams or add whole league above
+                            </p>
+                            {teamsLoading ? (
+                              <div className="h-8 rounded animate-pulse" style={{ background: "var(--surface-hover)" }} />
+                            ) : expandedLeague?.teams.length ? (
+                              expandedLeague.teams.map((team) => (
+                                <TeamCard
+                                  key={team.id}
+                                  team={team}
+                                  selected={!!selectedTeams.find((t) => t.id === team.id)}
+                                  onToggle={toggleTeam}
+                                />
+                              ))
+                            ) : (
+                              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                                No teams data yet.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -222,3 +307,4 @@ const PLACEHOLDER_LEAGUES: League[] = [
   { id: 4, name: "NBA",                  slug: "nba",               sport_type: "basketball",        country: "USA",           logo_url: null, event_count: 1230 },
   { id: 5, name: "MLS",                  slug: "mls",               sport_type: "soccer",            country: "USA/Canada",    logo_url: null, event_count: 378 },
 ];
+

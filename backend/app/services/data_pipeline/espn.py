@@ -61,20 +61,47 @@ class ESPNAdapter(SportAdapter):
             )
         return teams
 
-    async def fetch_events(self) -> list[RawEvent]:
+    async def _fetch_scoreboard(self, yyyymm: str, page: int = 1) -> dict:
+        # ESPN scoreboard requires per-month queries (YYYYMM), not date ranges
+        url = f"{self._base}/scoreboard?dates={yyyymm}&limit=100&page={page}"
+        async with httpx.AsyncClient(timeout=20) as client:
+            res = await client.get(url)
+            res.raise_for_status()
+        return res.json()
+
+    def _months_in_range(self) -> list[str]:
+        """Return YYYYMM strings from 30 days ago through days_ahead from today."""
         today = datetime.now(timezone.utc)
-        # Look 30 days back (completed results + scores) and full season ahead
         start = today - timedelta(days=30)
         end = today + timedelta(days=self.days_ahead)
-        date_range = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}"
+        months: list[str] = []
+        cur = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        while cur <= end:
+            months.append(cur.strftime("%Y%m"))
+            if cur.month == 12:
+                cur = cur.replace(year=cur.year + 1, month=1)
+            else:
+                cur = cur.replace(month=cur.month + 1)
+        return months
 
-        try:
-            data = await self._fetch_scoreboard(date_range, page=1)
-        except Exception:
-            return []
+    async def fetch_events(self) -> list[RawEvent]:
+        # Query each month separately — ESPN only returns data for YYYYMM format
+        raw_games: list[dict] = []
+        for yyyymm in self._months_in_range():
+            try:
+                data = await self._fetch_scoreboard(yyyymm)
+                raw_games.extend(data.get("events", []))
+            except Exception:
+                continue
 
+        # Deduplicate by ESPN game id (adjacent months can overlap)
+        seen_ids: set[str] = set()
         events: list[RawEvent] = []
-        for game in data.get("events", []):
+        for game in raw_games:
+            gid = game.get("id", "")
+            if gid in seen_ids:
+                continue
+            seen_ids.add(gid)
             competition = (game.get("competitions") or [{}])[0]
             competitors = competition.get("competitors", [])
 
@@ -120,7 +147,7 @@ class ESPNAdapter(SportAdapter):
                     url=game.get("links", [{}])[0].get("href"),
                 )
             )
-        return events[:100]
+        return events
 
 
 # ── Concrete league adapters ───────────────────────────────────────────────

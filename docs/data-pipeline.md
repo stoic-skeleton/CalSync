@@ -61,7 +61,7 @@ class SportAdapter(ABC):
 - **Cap:** 100 events max
 - **Retry:** Exponential backoff, 4 attempts (handles DNS failures at Docker cold-start)
 
-### IPLAdapter (`ipl.py`)
+### IPLAdapter (``)
 - **API:** TheSportsDB (`https://www.thesportsdb.com/api/v1/json/3`)
 - **`league_slug`:** `"ipl"`
 - **League ID:** `IPL_LEAGUE_ID = "4460"` (Indian Premier League Cricket — confirmed correct)

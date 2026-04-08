@@ -63,8 +63,10 @@ export function fetchEvents(params: {
   return apiFetch(`/api/events${q ? `?${q}` : ""}`);
 }
 
-export function fetchUpcomingEvents(limit = 20): Promise<Event[]> {
-  return apiFetch(`/api/events/upcoming?limit=${limit}`);
+export function fetchUpcomingEvents(limit = 20, sport?: string): Promise<Event[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (sport) qs.set("sport", sport);
+  return apiFetch(`/api/events/upcoming?${qs}`);
 }
 
 // ── Feeds ──────────────────────────────────────────────────────────────────

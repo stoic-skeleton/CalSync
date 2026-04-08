@@ -1,7 +1,45 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+
+// ── LogoImage ─────────────────────────────────────────────────────────────
+// A next/image wrapper that swaps in `fallback` on load error.
+// Must live in a "use client" file because it uses onError.
+
+interface LogoImageProps {
+  src: string;
+  alt: string;
+  fallback?: React.ReactNode;
+  width?: number;
+  height?: number;
+  className?: string;
+}
+
+export function LogoImage({
+  src,
+  alt,
+  fallback,
+  width = 40,
+  height = 40,
+  className = "object-contain",
+}: LogoImageProps) {
+  const [errored, setErrored] = useState(false);
+  if (errored || !src) return <>{fallback ?? null}</>;
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      onError={() => setErrored(true)}
+      unoptimized
+    />
+  );
+}
 
 const SPORTS = [
   { value: "", label: "All Sports", emoji: "🏆" },

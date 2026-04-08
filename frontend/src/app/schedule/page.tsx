@@ -15,11 +15,10 @@ export default function SchedulePage() {
   async function load(sportFilter: string) {
     setLoading(true);
     try {
-      const res = await fetchUpcomingEvents(50);
-      const filtered = sportFilter ? res.filter(e => e.league.sport_type === sportFilter) : res;
+      const res = await fetchUpcomingEvents(100, sportFilter || undefined);
       setEvents(
-        filtered.length > 0
-          ? filtered
+        res.length > 0
+          ? res
           : sportFilter
           ? PLACEHOLDER_EVENTS.filter(e => e.league.sport_type === sportFilter)
           : PLACEHOLDER_EVENTS

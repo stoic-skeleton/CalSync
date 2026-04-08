@@ -23,16 +23,19 @@ def _event_with_relations(db: Session, stmt):
 
 @router.get("/upcoming", response_model=list[EventOut])
 def upcoming_events(
-    limit: int = Query(20, le=100),
+    limit: int = Query(20, le=200),
+    sport: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
     stmt = (
         select(Event)
+        .join(Event.league)
         .where(Event.start_time >= now, Event.status != "cancelled")
-        .order_by(Event.start_time)
-        .limit(limit)
     )
+    if sport:
+        stmt = stmt.where(League.sport_type == sport)
+    stmt = stmt.order_by(Event.start_time).limit(limit)
     return _event_with_relations(db, stmt)
 
 
