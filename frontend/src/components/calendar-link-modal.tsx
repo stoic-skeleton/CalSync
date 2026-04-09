@@ -23,26 +23,30 @@ const PLATFORMS = [
     label: "Google Calendar",
     icon: "🗓️",
     getUrl: (feed: FeedCreationResponse) => toGoogleCalendarUrl(feed.feed_url),
-    hint: "Opens Google Calendar — click Add to subscribe",
+    hintDefault: "Opens Google Calendar — click Add to subscribe",
+    hintAndroid: "Opens in your browser — tap Add to subscribe (syncs to app)",
   },
   {
     id: "apple",
     label: "Apple Calendar",
     icon: "🍎",
     getUrl: (feed: FeedCreationResponse) => toWebcalUrl(feed.feed_url),
-    hint: "Opens Apple Calendar subscription dialog on Mac/iPhone",
+    hintDefault: "Opens Apple Calendar subscription dialog on Mac/iPhone",
+    hintAndroid: "Opens Apple Calendar subscription dialog on Mac/iPhone",
   },
   {
     id: "outlook",
     label: "Outlook",
     icon: "📧",
     getUrl: (feed: FeedCreationResponse) => toOutlookUrl(feed.feed_url),
-    hint: "Opens Outlook.com calendar — click Subscribe",
+    hintDefault: "Opens Outlook.com calendar — click Subscribe",
+    hintAndroid: "Opens Outlook.com calendar — click Subscribe",
   },
 ];
 
 export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalProps) {
   const [copied, setCopied] = useState(false);
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
 
   async function handleCopy() {
     const ok = await copyToClipboard(feed.feed_url);
@@ -124,21 +128,35 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
         </p>
         <div className="flex flex-col gap-2 mb-5">
           {PLATFORMS.map((p) => (
-            <a
-              key={p.id}
-              href={p.getUrl(feed)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <div key={p.id}>
+              <a
+                href={p.getUrl(feed)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] group"
-              style={{ borderColor: "var(--border)" }}
-            >
-              <span className="text-xl w-7 flex-shrink-0 text-center">{p.icon}</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{p.label}</p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{p.hint}</p>
-              </div>
-              <ExternalLink size={14} style={{ color: "var(--muted)" }} className="group-hover:text-[var(--accent)] transition-colors" />
-            </a>
+                style={{ borderColor: "var(--border)" }}
+              >
+                <span className="text-xl w-7 flex-shrink-0 text-center">{p.icon}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{p.label}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                    {isAndroid ? p.hintAndroid : p.hintDefault}
+                  </p>
+                </div>
+                <ExternalLink size={14} style={{ color: "var(--muted)" }} className="group-hover:text-[var(--accent)] transition-colors" />
+              </a>
+              {/* Android: secondary webcal:// link as fallback for native calendar apps */}
+              {isAndroid && p.id === "google" && (
+                <a
+                  href={toWebcalUrl(feed.feed_url)}
+                  className="flex items-center gap-2 px-4 py-2 text-xs rounded-xl border mt-1 transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]"
+                  style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+                >
+                  <span>📅</span>
+                  <span>Or try direct subscribe (opens native calendar app)</span>
+                </a>
+              )}
+            </div>
           ))}
         </div>
         {/* Localhost dev warning */}
@@ -162,10 +180,16 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
           style={{ background: "var(--accent-muted)", color: "var(--muted)" }}
         >
           <Smartphone size={14} className="flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
-          <span>
-            On iPhone, tap the <strong>"Apple Calendar"</strong> link above — it will open the Calendar app directly.
-            On Android, tap <strong>"Google Calendar"</strong> to subscribe.
-          </span>
+          {isAndroid ? (
+            <span>
+              Tap <strong>Google Calendar</strong> above — it opens in your browser, tap <strong>Add</strong>, and the calendar will sync to your Google Calendar app.
+            </span>
+          ) : (
+            <span>
+              On iPhone, tap <strong>Apple Calendar</strong> to subscribe directly in the app.
+              On Android, tap <strong>Google Calendar</strong> — it opens in your browser, tap Add to subscribe.
+            </span>
+          )}
         </div>
       </div>
     </div>
