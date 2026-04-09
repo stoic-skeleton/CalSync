@@ -57,7 +57,7 @@ export function toWebcalUrl(httpsUrl: string): string {
 
 /** Build a Google Calendar subscribe URL */
 export function toGoogleCalendarUrl(feedUrl: string): string {
-  const encoded = encodeURIComponent(feedUrl);
+  const encoded = encodeURIComponent(toWebcalUrl(feedUrl));
   return `https://calendar.google.com/calendar/r?cid=${encoded}`;
 }
 
