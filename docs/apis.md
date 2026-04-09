@@ -229,6 +229,100 @@ ESPN logo URLs come from several CDN subdomains. All must be in `next.config.ts`
 
 ---
 
+## CalSync Internal API Reference
+
+All endpoints are served by the FastAPI backend on port `8000`.
+
+### `GET /api/leagues`
+Returns all active leagues (seeded at startup).
+
+**Query params:** `?sport={sport_type}` (optional filter)
+
+**Response:** `League[]` — `id, name, slug, sport_type, country, logo_url, event_count`
+
+---
+
+### `GET /api/leagues/{slug}`
+Returns a single league with its full team list.
+
+**Response:** `League & { teams: Team[] }`
+
+---
+
+### `GET /api/events/upcoming`
+Returns upcoming events across all leagues.
+
+**Query params:** `?limit=20&sport={sport_type}`
+
+---
+
+### `GET /api/events`
+Paginated event list with filters.
+
+**Query params:** `?league=formula-1&team=lal&from=ISO&to=ISO&page=1&page_size=20`
+
+---
+
+### `POST /api/feeds`
+Create (or retrieve) a calendar feed.
+
+**Request body:**
+```json
+{
+  "league_ids": [1, 2],
+  "team_ids": [],
+  "reminder_minutes": 30
+}
+```
+- `reminder_minutes` is optional (`null` / 15 / 30 / 60). Stored on the feed and embedded as `VALARM` in every ICS event.
+
+**Response:**
+```json
+{
+  "feed_hash": "76b296d0...",
+  "feed_url": "http://localhost:8000/cal/76b296d0....ics",
+  "webcal_url": "webcal://localhost:8000/cal/76b296d0....ics",
+  "event_count": 141
+}
+```
+Side-effects: pre-warms the Redis ICS cache immediately on creation.
+
+---
+
+### `GET /cal/{feed_hash}.ics`
+Serves the RFC 5545 `.ics` calendar feed.
+
+- Returns bytes with `Content-Type: text/calendar`.
+- Served from Redis cache (15 min TTL) when warm; falls back to PostgreSQL + ICS generation.
+- Increments `access_count` and updates `last_accessed_at` on `CalendarFeed` (best-effort even on cache hits).
+- Contains `VALARM` per event if `reminder_minutes` was set at feed creation.
+
+---
+
+### `GET /api/admin/feeds`
+Returns all generated feeds with analytics data. No auth — intended for internal/operator use.
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "feed_hash": "f40b3ae2...",
+      "league_ids": [2, 4],
+      "team_ids": [],
+      "event_count": 107,
+      "access_count": 3,
+      "last_accessed_at": "2026-04-08T01:23:45+00:00",
+      "created_at": "2026-04-08T00:10:00+00:00",
+      "reminder_minutes": 15
+    }
+  ],
+  "total": 4
+}
+```
+
+---
+
 ## Former API: Jolpica / Ergast (F1 — Deprecated)
 
 The original F1 adapter used the Jolpica API (the successor to the retired Ergast API):

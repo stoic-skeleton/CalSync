@@ -88,6 +88,7 @@ class PaginatedEvents(BaseModel):
 class FeedCreateRequest(BaseModel):
     league_ids: list[int] = []
     team_ids: list[int] = []
+    reminder_minutes: int | None = None
 
 
 class FeedCreateResponse(BaseModel):

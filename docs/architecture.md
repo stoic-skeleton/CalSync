@@ -25,6 +25,10 @@ CalSync is a free sports calendar sync service. Users browse leagues and teams, 
 ```
 calsync/
 ├── backend/
+│   ├── alembic/                # Alembic migration framework
+│   │   ├── env.py              # Migration entrypoint — reads DATABASE_URL
+│   │   └── versions/           # Revision scripts (one per schema change)
+│   ├── alembic.ini             # Alembic config (script_location = alembic)
 │   ├── app/
 │   │   ├── config.py           # Pydantic Settings — reads from .env
 │   │   ├── db.py               # SQLAlchemy engine + session factory
@@ -34,8 +38,8 @@ calsync/
 │   │   ├── seed.py             # Idempotent league row seeder
 │   │   ├── routers/
 │   │   │   ├── leagues.py      # GET /api/leagues, GET /api/leagues/{slug}
-│   │   │   ├── events.py       # GET /api/events
-│   │   │   └── feeds.py        # POST /api/feeds, GET /cal/{hash}.ics
+│   │   │   ├── events.py       # GET /api/events, GET /api/events/upcoming
+│   │   │   └── feeds.py        # POST /api/feeds, GET /cal/{hash}.ics, GET /api/admin/feeds
 │   │   └── services/
 │   │       ├── data_pipeline/
 │   │       │   ├── base.py     # Abstract SportAdapter + RawEvent/RawTeam dataclasses
@@ -75,20 +79,28 @@ calsync/
 ## Data Flow
 
 ```
-External APIs          Backend                  Frontend
-─────────────          ───────                  ────────
+External APIs          Backend                        Frontend
+─────────────          ───────                        ────────
 OpenF1            ──►  F1Adapter
-TheSportsDB       ──►  IPLAdapter     ──►  ingest.py  ──►  PostgreSQL
-ESPN              ──►  ESPNAdapter              │
-                                                │  (every 6h via APScheduler)
-                                                ▼
-                            GET /api/leagues  ◄── Browse page
-                            GET /api/events   ◄── Schedule page
-                            POST /api/feeds   ◄── "Get Calendar" modal
-                            GET /cal/{hash}.ics  ◄── Calendar client (polling)
-                                    │
-                                    ▼
-                                 Redis cache (15 min TTL)
+TheSportsDB       ──►  IPLAdapter  ──►  ingest.py  ──►  PostgreSQL
+ESPN              ──►  ESPNAdapter          │
+                                            │  (every 6h via APScheduler)
+                                            ▼
+                        GET /api/leagues  ◄─── Browse page
+                        GET /api/teams    ◄─── League detail / team filter
+                        GET /api/events   ◄─── Schedule page
+                        POST /api/feeds   ◄─── Get Calendar page
+                              │  (pre-warms Redis cache immediately)
+                              ▼
+                        GET /cal/{hash}.ics  ◄── Calendar client (polling)
+                              │
+                              ▼
+                         Redis cache (15 min TTL)
+                              │ (miss)
+                              ▼
+                         PostgreSQL → ics_generator → VALARM injection
+
+                        GET /api/admin/feeds  ◄── Internal analytics
 ```
 
 ---
@@ -139,13 +151,16 @@ ESPN              ──►  ESPNAdapter              │
 | url                 | text        |                                      |
 
 ### `calendar_feeds`
-| Column          | Type          | Notes                                  |
-|-----------------|---------------|----------------------------------------|
-| id              | int PK        |                                        |
-| feed_hash       | varchar(64)   | SHA-256 of league_ids + team_ids JSON  |
-| league_ids      | JSON          | list of league.id integers             |
-| team_ids        | JSON          | list of team.id integers               |
-| last_accessed_at| timestamptz   | updated on each feed fetch             |
+| Column           | Type          | Notes                                                        |
+|------------------|---------------|--------------------------------------------------------------|
+| id               | int PK        |                                                              |
+| feed_hash        | varchar(64)   | First 32 chars of SHA-256(sorted league_ids + team_ids)      |
+| league_ids       | JSON          | list of league.id integers                                   |
+| team_ids         | JSON          | list of team.id integers                                     |
+| reminder_minutes | int \| null   | Chosen at feed creation: null / 15 / 30 / 60                 |
+| access_count     | int           | Incremented on every `GET /cal/{hash}.ics` request           |
+| created_at       | timestamptz   | Feed creation timestamp                                      |
+| last_accessed_at | timestamptz   | Updated on every ICS fetch (including cached responses)      |
 
 ---
 
@@ -160,11 +175,14 @@ ESPN              ──►  ESPNAdapter              │
 
 ## Calendar Feed Lifecycle
 
-1. User selects leagues/teams in the UI.
-2. Frontend `POST /api/feeds` — body `{league_ids, team_ids}`.
-3. Backend hashes the selection, creates or retrieves a `CalendarFeed` row, returns `feed_url` and `webcal_url`.
-4. User clicks "Add to Google Calendar" → opens `https://calendar.google.com/calendar/r?cid={webcal_url}`.
-5. On subsequent polls by the calendar client: `GET /cal/{hash}.ics` — served from Redis cache (15 min TTL), then PostgreSQL.
+1. **Browse** — User visits `/browse`, selects leagues and/or individual teams.
+2. **Configure** — `/get-calendar?leagues=1,2&teams=3` loads a summary of selections plus a reminder selector (None / 15m / 30m / 60m before each event).
+3. **Generate** — User clicks *Generate Calendar Link*. Frontend `POST /api/feeds` with body `{league_ids, team_ids, reminder_minutes}`.
+4. **Feed creation** — Backend hashes the selection → creates or retrieves a `CalendarFeed` row (stores `reminder_minutes`) → pre-builds and caches the `.ics` in Redis (so the first subscriber gets a fast response). Returns `feed_url`, `webcal_url`, `event_count`.
+5. **Subscribe** — Modal shows the feed URL + one-click buttons for Google Calendar, Apple Calendar, and Outlook. User clicks a button and the calendar app subscribes to the webcal URL.
+6. **ICS delivery** — Calendar client polls `GET /cal/{hash}.ics`. Response served from Redis if cached; on cache miss: query PostgreSQL → build ICS → inject `VALARM` per event if `reminder_minutes` is set → cache result. `access_count` is incremented on every request.
+7. **Auto-refresh** — Backend ingests fresh schedules every 6 hours. Calendar clients re-poll every 15–30 minutes (set via `REFRESH-INTERVAL` in the ICS). Users automatically see updated kickoff times, cancellations, etc.
+8. **Reminders** — Calendar apps honour the embedded `VALARM` components. Users receive a notification N minutes before each event with no further action required.
 
 ---
 

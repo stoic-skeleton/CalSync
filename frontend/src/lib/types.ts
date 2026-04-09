@@ -53,6 +53,7 @@ export interface Event {
 export interface FeedCreationRequest {
   league_ids: number[];
   team_ids: number[];
+  reminder_minutes?: number | null;
 }
 
 export interface FeedCreationResponse {

@@ -148,7 +148,7 @@ ADAPTERS = [F1Adapter(), IPLAdapter(), NFLAdapter(), NBAAdapter(), MLSAdapter()]
 
 ## .ics Event Generation
 
-`build_ics(events, feed_hash)` in `ics_generator.py`:
+`build_ics(events, feed_hash, reminder_minutes=None)` in `ics_generator.py`:
 
 - `UID`: `{external_id or id}@calsync` — stable across refreshes
 - `DTSTART`: `event.start_time` in UTC
@@ -161,5 +161,22 @@ ADAPTERS = [F1Adapter(), IPLAdapter(), NFLAdapter(), NBAAdapter(), MLSAdapter()]
 - `STATUS`: `CONFIRMED` / `TENTATIVE` (postponed) / `CANCELLED`
 - `REFRESH-INTERVAL`: `PT30M` — hints to calendar clients to re-fetch every 30 minutes
 - `X-WR-CALNAME`: `"CalSync — Sports Schedule"`
+
+### VALARM (optional reminders)
+
+When `reminder_minutes` is not `None`, a `VALARM` sub-component is embedded inside each `VEVENT`:
+
+```ical
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Reminder: {event.title}
+TRIGGER:-PT{N}M
+END:VALARM
+```
+
+- `TRIGGER` uses a relative `timedelta` (e.g. `timedelta(minutes=-30)`) as required by the `icalendar` library.
+- The reminder fires N minutes before `DTSTART` in the subscriber’s calendar app.
+- `reminder_minutes` is stored on the `CalendarFeed` row at creation time and used on every subsequent ICS build.
+- Supported values: 15, 30, 60 (or `null` for no alarm).
 
 The feed is cached in Redis with a 15-minute TTL (`900` seconds, `Cache-Control: public, max-age=900`).

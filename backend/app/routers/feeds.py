@@ -33,6 +33,7 @@ def create_feed(body: FeedCreateRequest, db: Session = Depends(get_db)):
             feed_hash=feed_hash,
             league_ids=body.league_ids,
             team_ids=body.team_ids,
+            reminder_minutes=body.reminder_minutes,
         )
         db.add(feed)
         db.commit()
@@ -49,6 +50,34 @@ def create_feed(body: FeedCreateRequest, db: Session = Depends(get_db)):
     feed_url = f"{settings.api_base_url}/cal/{feed_hash}.ics"
     webcal_url = feed_url.replace("http://", "webcal://").replace("https://", "webcal://")
 
+    # Pre-warm ICS cache (best-effort) so first subscriber gets a fast response
+    if _redis:
+        try:
+            now = datetime.now(timezone.utc)
+            stmt = (
+                select(Event)
+                .where(Event.start_time >= now)
+                .options(
+                    joinedload(Event.league),
+                    joinedload(Event.home_team),
+                    joinedload(Event.away_team),
+                )
+                .order_by(Event.start_time)
+            )
+            if body.league_ids:
+                stmt = stmt.where(Event.league_id.in_(body.league_ids))
+            if body.team_ids:
+                stmt = stmt.where(
+                    (Event.home_team_id.in_(body.team_ids)) |
+                    (Event.away_team_id.in_(body.team_ids))
+                )
+            events = db.scalars(stmt).all()
+            ics_bytes = build_ics(events, feed_hash, feed.reminder_minutes)
+            _redis.setex(f"feed:{feed_hash}", 900, ics_bytes)
+        except Exception:
+            # best-effort pre-warm; ignore failures
+            pass
+
     return FeedCreateResponse(
         feed_hash=feed_hash,
         feed_url=feed_url,
@@ -63,6 +92,17 @@ def serve_ics(feed_hash: str, db: Session = Depends(get_db)):
     if _redis:
         cached = _redis.get(f"feed:{feed_hash}")
         if cached:
+            # Update access metrics even for cached responses (best-effort)
+            try:
+                feed_cached = db.scalar(select(CalendarFeed).where(CalendarFeed.feed_hash == feed_hash))
+                if feed_cached:
+                    now = datetime.now(timezone.utc)
+                    feed_cached.last_accessed_at = now
+                    feed_cached.access_count = (feed_cached.access_count or 0) + 1
+                    db.commit()
+            except Exception:
+                pass
+
             return Response(
                 content=cached,
                 media_type="text/calendar; charset=utf-8",
@@ -76,8 +116,13 @@ def serve_ics(feed_hash: str, db: Session = Depends(get_db)):
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
 
-    # Update last accessed
-    feed.last_accessed_at = datetime.now(timezone.utc)
+    # Update last accessed + access count
+    now = datetime.now(timezone.utc)
+    feed.last_accessed_at = now
+    try:
+        feed.access_count = (feed.access_count or 0) + 1
+    except Exception:
+        feed.access_count = 1
     db.commit()
 
     # Fetch matching events
@@ -101,7 +146,7 @@ def serve_ics(feed_hash: str, db: Session = Depends(get_db)):
         )
     events = db.scalars(stmt).all()
 
-    ics_bytes = build_ics(events, feed_hash)
+    ics_bytes = build_ics(events, feed_hash, feed.reminder_minutes)
 
     # Cache for 15 minutes
     if _redis:
@@ -115,3 +160,30 @@ def serve_ics(feed_hash: str, db: Session = Depends(get_db)):
             "Cache-Control": "public, max-age=900",
         },
     )
+
+
+@router.get("/api/admin/feeds")
+def admin_list_feeds(db: Session = Depends(get_db)):
+    feeds = db.scalars(select(CalendarFeed).order_by(CalendarFeed.created_at.desc())).all()
+    out = []
+    now = datetime.now(timezone.utc)
+    for f in feeds:
+        # count upcoming events for this feed
+        stmt = select(Event).where(Event.start_time >= now)
+        if f.league_ids:
+            stmt = stmt.where(Event.league_id.in_(f.league_ids))
+        if f.team_ids:
+            stmt = stmt.where((Event.home_team_id.in_(f.team_ids)) | (Event.away_team_id.in_(f.team_ids)))
+        events = db.scalars(stmt).all()
+        out.append({
+            "feed_hash": f.feed_hash,
+            "league_ids": f.league_ids,
+            "team_ids": f.team_ids,
+            "event_count": len(events),
+            "access_count": f.access_count or 0,
+            "last_accessed_at": f.last_accessed_at.isoformat() if f.last_accessed_at else None,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+            "reminder_minutes": f.reminder_minutes,
+        })
+
+    return {"items": out, "total": len(out)}

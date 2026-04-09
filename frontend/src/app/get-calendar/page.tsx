@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CalendarDays, Loader2, ArrowLeft } from "lucide-react";
 import { createFeed } from "@/lib/api";
@@ -41,20 +41,16 @@ function BuildPageInner() {
   const [loading, setLoading] = useState(false);
   const [feed, setFeed] = useState<FeedCreationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null);
 
-  // If query params are present, auto-create on mount
-  useEffect(() => {
-    if (leagueIds.length > 0 || teamIds.length > 0) {
-      handleGenerate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No auto-generate on mount — we always show the reminder selector first
+  // so users can choose a reminder before creating the feed.
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
-      const result = await createFeed({ league_ids: leagueIds, team_ids: teamIds });
+      const result = await createFeed({ league_ids: leagueIds, team_ids: teamIds, reminder_minutes: reminderMinutes });
       setFeed(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -150,6 +146,16 @@ function BuildPageInner() {
         {/* Generate button */}
         {hasSelections && !feed && (
           <div className="text-center">
+            {/* Reminder selector */}
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <label className="text-sm" style={{ color: "var(--muted)" }}>Reminder:</label>
+              <div className="inline-flex gap-2">
+                <button onClick={() => setReminderMinutes(null)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===null?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>None</button>
+                <button onClick={() => setReminderMinutes(15)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===15?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>15m</button>
+                <button onClick={() => setReminderMinutes(30)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===30?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>30m</button>
+                <button onClick={() => setReminderMinutes(60)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===60?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>60m</button>
+              </div>
+            </div>
             <button
               onClick={handleGenerate}
               disabled={loading}

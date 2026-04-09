@@ -2,12 +2,12 @@
 RFC 5545-compliant .ics feed generator.
 Converts a list of SQLAlchemy Event objects into a VCALENDAR bytes payload.
 """
-from datetime import timezone
-from icalendar import Calendar, Event as ICalEvent, vText, vDatetime
+from datetime import timezone, timedelta
+from icalendar import Calendar, Event as ICalEvent, Alarm, vText, vDatetime
 from app.models import Event
 
 
-def build_ics(events: list[Event], feed_hash: str) -> bytes:
+def build_ics(events: list[Event], feed_hash: str, reminder_minutes: int | None = None) -> bytes:
     cal = Calendar()
     cal.add("PRODID", "-//CalSync//Sports Calendar//EN")
     cal.add("VERSION", "2.0")
@@ -61,6 +61,15 @@ def build_ics(events: list[Event], feed_hash: str) -> bytes:
         # URL
         if event.url:
             ical_event.add("URL", event.url)
+
+        # Optional reminder (VALARM) added per-event when requested
+        if reminder_minutes is not None:
+            alarm = Alarm()
+            alarm.add("ACTION", "DISPLAY")
+            alarm.add("DESCRIPTION", f"Reminder: {event.title}")
+            # timedelta required by icalendar library for duration-based triggers
+            alarm.add("TRIGGER", timedelta(minutes=-int(reminder_minutes)))
+            ical_event.add_component(alarm)
 
         cal.add_component(ical_event)
 

@@ -94,6 +94,8 @@ class CalendarFeed(Base):
     feed_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     league_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     team_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    access_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reminder_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
