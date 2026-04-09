@@ -23,7 +23,7 @@ const PLATFORMS = [
     label: "Google Calendar",
     icon: "🗓️",
     getUrl: (feed: FeedCreationResponse) => toGoogleCalendarUrl(feed.feed_url),
-    hint: "Opens Google Calendar in a new tab — click Add",
+    hint: "Opens Google Calendar — click Add to subscribe",
   },
   {
     id: "apple",
@@ -129,7 +129,7 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
               href={p.getUrl(feed)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] group"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] group"
               style={{ borderColor: "var(--border)" }}
             >
               <span className="text-xl w-7 flex-shrink-0 text-center">{p.icon}</span>
