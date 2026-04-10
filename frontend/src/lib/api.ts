@@ -5,6 +5,9 @@ import type {
   FeedCreationRequest,
   FeedCreationResponse,
   PaginatedResponse,
+  User,
+  AdminStats,
+  AdminUsersResponse,
 } from "./types";
 
 const BASE_URL =
@@ -16,6 +19,7 @@ async function apiFetch<T>(
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
+    credentials: init?.credentials ?? "same-origin",
     ...init,
   });
   if (!res.ok) {
@@ -74,6 +78,62 @@ export function fetchUpcomingEvents(limit = 20, sport?: string): Promise<Event[]
 export function createFeed(body: FeedCreationRequest): Promise<FeedCreationResponse> {
   return apiFetch("/api/feeds", {
     method: "POST",
+    credentials: "include",
     body: JSON.stringify(body),
+  });
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+
+export type RegisterPayload = { email: string; password: string; name?: string };
+export type LoginPayload = { email: string; password: string };
+
+export function registerUser(payload: RegisterPayload) {
+  return apiFetch<User>("/api/auth/register", {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function loginUser(payload: LoginPayload) {
+  return apiFetch<User>("/api/auth/login", {
+    method: "POST",
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function logoutUser() {
+  return apiFetch<void>("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  });
+}
+
+export function fetchCurrentUser() {
+  return apiFetch<User>("/api/auth/me", {
+    method: "GET",
+    credentials: "include",
+  });
+}
+
+
+// ── Admin API ─────────────────────────────────────────────────────────────
+
+export function fetchAdminStats(): Promise<AdminStats> {
+  return apiFetch<AdminStats>("/api/admin/stats", { method: "GET", credentials: "include" });
+}
+
+export function fetchAdminUsers(page = 1, pageSize = 20): Promise<AdminUsersResponse> {
+  const qs = `?page=${page}&page_size=${pageSize}`;
+  return apiFetch<AdminUsersResponse>(`/api/admin/users${qs}`, { method: "GET", credentials: "include" });
+}
+
+export function updateAdminUser(userId: number, payload: { tier?: string; is_active?: boolean }) {
+  return apiFetch<User>(`/api/admin/users/${userId}`, {
+    method: "PATCH",
+    credentials: "include",
+    body: JSON.stringify(payload),
   });
 }

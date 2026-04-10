@@ -2,10 +2,11 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { CalendarDays, Loader2, ArrowLeft } from "lucide-react";
+import { CalendarDays, Loader2, ArrowLeft, LogIn } from "lucide-react";
 import { createFeed } from "@/lib/api";
 import CalendarLinkModal from "@/components/calendar-link-modal";
 import type { FeedCreationResponse, League } from "@/lib/types";
+import { useAuth } from "@/components/auth-provider";
 
 // Placeholder data matching browse page placeholders
 const PLACEHOLDER_LEAGUES: League[] = [
@@ -24,6 +25,7 @@ const SPORT_EMOJI: Record<string, string> = {
 function BuildPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const leagueIds = (searchParams.get("leagues") ?? "")
     .split(",")
@@ -54,6 +56,11 @@ function BuildPageInner() {
       setFeed(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // If the API returned a 401 Not authenticated, redirect to login with next param
+      if (msg.includes("API 401") || msg.toLowerCase().includes("not authenticated")) {
+        router.push(`/login?next=/get-calendar`);
+        return;
+      }
       setError(`Could not reach backend: ${msg}`);
     } finally {
       setLoading(false);
@@ -143,31 +150,59 @@ function BuildPageInner() {
           </div>
         )}
 
-        {/* Generate button */}
+        {/* Generate button / auth prompt */}
         {hasSelections && !feed && (
           <div className="text-center">
-            {/* Reminder selector */}
-            <div className="mb-4 flex items-center justify-center gap-3">
-              <label className="text-sm" style={{ color: "var(--muted)" }}>Reminder:</label>
-              <div className="inline-flex gap-2">
-                <button onClick={() => setReminderMinutes(null)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===null?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>None</button>
-                <button onClick={() => setReminderMinutes(15)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===15?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>15m</button>
-                <button onClick={() => setReminderMinutes(30)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===30?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>30m</button>
-                <button onClick={() => setReminderMinutes(60)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===60?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>60m</button>
+            {!authLoading && !user ? (
+              /* Not signed in — prompt to log in */
+              <div className="rounded-2xl p-6 border" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
+                <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
+                  Sign in to generate your calendar link. It&apos;s free.
+                </p>
+                <button
+                  onClick={() => router.push(`/login?next=/get-calendar?${searchParams?.toString() ?? ""}`)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm"
+                  style={{ background: "var(--accent)" }}
+                >
+                  <LogIn size={16} /> Sign in to continue
+                </button>
+                <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
+                  No account?{" "}
+                  <button
+                    onClick={() => router.push(`/register?next=/get-calendar?${searchParams?.toString() ?? ""}`)}
+                    className="underline"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    Create one free
+                  </button>
+                </p>
               </div>
-            </div>
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-white text-base transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
-              style={{ background: "var(--accent)" }}
-            >
-              {loading ? (
-                <><Loader2 size={18} className="animate-spin" /> Generating…</>
-              ) : (
-                <><CalendarDays size={18} /> Generate Calendar Link</>
-              )}
-            </button>
+            ) : (
+              <>
+                {/* Reminder selector */}
+                <div className="mb-4 flex items-center justify-center gap-3">
+                  <label className="text-sm" style={{ color: "var(--muted)" }}>Reminder:</label>
+                  <div className="inline-flex gap-2">
+                    <button onClick={() => setReminderMinutes(null)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===null?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>None</button>
+                    <button onClick={() => setReminderMinutes(15)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===15?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>15m</button>
+                    <button onClick={() => setReminderMinutes(30)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===30?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>30m</button>
+                    <button onClick={() => setReminderMinutes(60)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===60?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>60m</button>
+                  </div>
+                </div>
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-white text-base transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+                  style={{ background: "var(--accent)" }}
+                >
+                  {loading ? (
+                    <><Loader2 size={18} className="animate-spin" /> Generating…</>
+                  ) : (
+                    <><CalendarDays size={18} /> Generate Calendar Link</>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         )}
 

@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import engine, Base
-from app.models import League, Team, Event, CalendarFeed  # noqa: F401 — register models
-from app.routers import leagues, events, feeds
+from app.models import League, Team, Event, CalendarFeed, User  # noqa: F401 — register models
+from app.routers import leagues, events, feeds, auth, admin
 from app.seed import seed
 from app.services.scheduler import create_scheduler, _run_all_ingestions
 
@@ -69,6 +69,8 @@ app.add_middleware(
 app.include_router(leagues.router)
 app.include_router(events.router)
 app.include_router(feeds.router)
+app.include_router(auth.router, prefix="/api/auth")
+app.include_router(admin.router)
 
 
 @app.get("/api/health")

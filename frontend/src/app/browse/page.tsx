@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Globe } from "lucide-react";
+import { Search, Globe, Zap } from "lucide-react";
 import SportFilter, { SelectionBar } from "@/components/sport-filter";
 import LeagueCard from "@/components/league-card";
 import TeamCard from "@/components/team-card";
 import { fetchLeagues, fetchLeague } from "@/lib/api";
 import type { League, Team } from "@/lib/types";
+import { useAuth } from "@/components/auth-provider";
+
+const FREEMIUM_LEAGUE_LIMIT = 3;
 
 // Map country strings → display region group
 function toRegion(country: string | null): string {
@@ -24,11 +27,14 @@ function toRegion(country: string | null): string {
 
 export default function BrowsePage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isFreemium = !user || user.tier === "freemium";
   const [sport, setSport] = useState("");
   const [region, setRegion] = useState("");
   const [search, setSearch] = useState("");
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
+  const [limitBannerLeague, setLimitBannerLeague] = useState<string | null>(null);
 
   // Expanded league + teams
   const [expandedLeague, setExpandedLeague] = useState<
@@ -65,11 +71,19 @@ export default function BrowsePage() {
   }, [expandedLeague]);
 
   function toggleLeague(league: League) {
-    setSelectedLeagues((prev) =>
-      prev.find((l) => l.id === league.id)
-        ? prev.filter((l) => l.id !== league.id)
-        : [...prev, league]
-    );
+    setSelectedLeagues((prev) => {
+      if (prev.find((l) => l.id === league.id)) {
+        setLimitBannerLeague(null);
+        return prev.filter((l) => l.id !== league.id);
+      }
+      // Enforce freemium cap
+      if (isFreemium && prev.length >= FREEMIUM_LEAGUE_LIMIT) {
+        setLimitBannerLeague(league.name);
+        return prev; // don't add
+      }
+      setLimitBannerLeague(null);
+      return [...prev, league];
+    });
   }
 
   function toggleTeam(team: Team) {
@@ -136,6 +150,49 @@ export default function BrowsePage() {
             Filter by sport, country, or search. Select leagues or individual teams.
           </p>
         </div>
+
+        {/* Freemium upgrade banner */}
+        {isFreemium && (
+          <div
+            className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 mb-6 text-sm"
+            style={{ background: "var(--accent-muted)", border: "1px solid var(--accent)" }}
+          >
+            <div className="flex items-center gap-2" style={{ color: "var(--accent)" }}>
+              <Zap size={15} />
+              <span>
+                {user
+                  ? <>You&rsquo;re on the <strong>Free plan</strong> &mdash; up to {FREEMIUM_LEAGUE_LIMIT} leagues per calendar feed.</>
+                  : <>Free plan includes up to <strong>{FREEMIUM_LEAGUE_LIMIT} leagues</strong>. Sign in to save your feed.</>}
+              </span>
+            </div>
+            <a
+              href="/pricing"
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: "var(--accent)" }}
+            >
+              {user ? "Upgrade to Pro →" : "See plans →"}
+            </a>
+          </div>
+        )}
+
+        {/* Hard-cap warning when user tries to exceed limit */}
+        {limitBannerLeague && (
+          <div
+            className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 mb-4 text-sm"
+            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid var(--danger)", color: "var(--danger)" }}
+          >
+            <span>
+              Can&rsquo;t add <strong>{limitBannerLeague}</strong> &mdash; Free plan is limited to {FREEMIUM_LEAGUE_LIMIT} leagues. Remove one first or upgrade.
+            </span>
+            <a
+              href="/pricing"
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: "var(--danger)" }}
+            >
+              Upgrade
+            </a>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col gap-3 mb-8">
@@ -292,7 +349,9 @@ export default function BrowsePage() {
       {/* Sticky bottom selection bar */}
       <SelectionBar
         count={totalSelected}
-        onClear={() => { setSelectedLeagues([]); setSelectedTeams([]); }}
+        leagueCount={selectedLeagues.length}
+        tier={user?.tier ?? null}
+        onClear={() => { setSelectedLeagues([]); setSelectedTeams([]); setLimitBannerLeague(null); }}
         onBuild={handleBuild}
       />
     </div>

@@ -1,5 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 
 # ── League ────────────────────────────────────────────────────────────────
@@ -96,3 +97,39 @@ class FeedCreateResponse(BaseModel):
     feed_url: str
     webcal_url: str
     event_count: int
+
+
+# ── Auth / Users ─────────────────────────────────────────────────────────
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    email: str
+    name: str | None
+    picture_url: str | None
+    tier: str
+    is_active: bool
+    created_at: datetime
+
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    name: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class AdminUserUpdate(BaseModel):
+    tier: Literal["freemium", "pro", "admin"] | None = None
+    is_active: bool | None = None

@@ -75,3 +75,28 @@ export interface Selection {
   leagues: League[];
   teams: Team[];
 }
+
+// ── Auth / Users ───────────────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  email: string;
+  name?: string | null;
+  picture_url?: string | null;
+  tier: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminStats {
+  users: { total: number; freemium: number; pro: number; admin: number };
+  feeds: { total: number };
+  events: { total: number };
+}
+
+export interface AdminUsersResponse {
+  items: User[];
+  total: number;
+  page: number;
+  page_size: number;
+}

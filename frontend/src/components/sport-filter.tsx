@@ -81,16 +81,50 @@ export default function SportFilter({ value, onChange }: SportFilterProps) {
 
 interface SelectionBarProps {
   count: number;
+  leagueCount: number;
+  tier: string | null; // null = loading / logged out
   onClear: () => void;
   onBuild: () => void;
 }
 
-export function SelectionBar({ count, onClear, onBuild }: SelectionBarProps) {
+const FREEMIUM_LEAGUE_LIMIT = 3;
+
+export function SelectionBar({ count, leagueCount, tier, onClear, onBuild }: SelectionBarProps) {
   if (count === 0) return null;
+
+  const isFreemium = !tier || tier === "freemium";
+  const atLimit = isFreemium && leagueCount >= FREEMIUM_LEAGUE_LIMIT;
+  const overLimit = isFreemium && leagueCount > FREEMIUM_LEAGUE_LIMIT;
+
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-md px-4">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-lg px-4">
+      {/* Upgrade nudge — shown above the bar when at/over limit */}
+      {atLimit && (
+        <div
+          className="mb-2 flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-sm"
+          style={{
+            background: "var(--accent-muted)",
+            border: "1px solid var(--accent)",
+            color: "var(--accent)",
+          }}
+        >
+          <span className="font-medium">
+            {overLimit
+              ? `Free plan allows max ${FREEMIUM_LEAGUE_LIMIT} leagues — remove ${leagueCount - FREEMIUM_LEAGUE_LIMIT} to continue`
+              : `Free plan: ${leagueCount}/${FREEMIUM_LEAGUE_LIMIT} leagues used`}
+          </span>
+          <a
+            href="/pricing"
+            className="shrink-0 px-3 py-1 rounded-lg text-xs font-bold text-white"
+            style={{ background: "var(--accent)" }}
+          >
+            Upgrade →
+          </a>
+        </div>
+      )}
+
       <div
-        className="flex items-center justify-between gap-4 rounded-2xl px-5 py-3.5 shadow-2xl"
+        className="flex items-center justify-between gap-4 rounded-2xl px-5 py-3.5"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
@@ -101,13 +135,24 @@ export function SelectionBar({ count, onClear, onBuild }: SelectionBarProps) {
         <div className="flex items-center gap-2">
           <span
             className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-            style={{ background: "var(--accent)" }}
+            style={{ background: overLimit ? "var(--danger)" : "var(--accent)" }}
           >
             {count}
           </span>
           <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
             {count === 1 ? "1 selection" : `${count} selections`}
           </span>
+          {isFreemium && leagueCount > 0 && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+              style={{
+                background: overLimit ? "rgba(239,68,68,0.15)" : "var(--surface-hover)",
+                color: overLimit ? "var(--danger)" : "var(--muted)",
+              }}
+            >
+              {leagueCount}/{FREEMIUM_LEAGUE_LIMIT} leagues
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -120,7 +165,8 @@ export function SelectionBar({ count, onClear, onBuild }: SelectionBarProps) {
           </button>
           <button
             onClick={onBuild}
-            className="px-4 py-1.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
+            disabled={overLimit}
+            className="px-4 py-1.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: "var(--accent)" }}
           >
             Get Calendar →

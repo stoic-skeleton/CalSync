@@ -10,6 +10,18 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"
     api_base_url: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:3000"
+
+    # Auth / JWT
+    secret_key: str | None = None
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    # Google OAuth (set in env for production)
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+
+    # Cookie
+    session_cookie_name: str = "calsync_session"
 
     @property
     def cors_origins_list(self) -> list[str]:

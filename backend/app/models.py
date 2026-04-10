@@ -89,18 +89,36 @@ class Event(Base):
 
 class CalendarFeed(Base):
     __tablename__ = "calendar_feeds"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     feed_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     league_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
     team_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False, default=list)
+    # Optional owner for feeds created by logged-in users
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    user: Mapped["User | None"] = relationship("User", back_populates="feeds")
     access_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reminder_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
     @staticmethod
     def make_hash(league_ids: list[int], team_ids: list[int]) -> str:
         """Deterministic hash so identical selections reuse the same feed."""
         key = f"l:{sorted(league_ids)}-t:{sorted(team_ids)}"
         return hashlib.sha256(key.encode()).hexdigest()[:32]
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
+    name: Mapped[str | None] = mapped_column(String(150))
+    picture_url: Mapped[str | None] = mapped_column(Text)
+    google_id: Mapped[str | None] = mapped_column(String(200), unique=True)
+    hashed_password: Mapped[str | None] = mapped_column(String(200))
+    tier: Mapped[str] = mapped_column(String(20), default="freemium", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    feeds: Mapped[list["CalendarFeed"]] = relationship("CalendarFeed", back_populates="user")

@@ -1,6 +1,40 @@
 """Seed initial league and team data into the database."""
+import os
+
 from app.db import SessionLocal, engine, Base
-from app.models import League, Team  # noqa: F401 — registers models
+from app.models import League, Team, User  # noqa: F401 — registers models
+
+
+def _seed_admin(db) -> None:
+    """Create or promote the admin user defined by ADMIN_EMAIL / ADMIN_PASSWORD env vars."""
+    email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    password = os.getenv("ADMIN_PASSWORD", "").strip()
+    if not email or not password:
+        return
+
+    # Import here to avoid circular imports at module load time
+    from app.services.auth import hash_password
+
+    from sqlalchemy import select
+    existing = db.scalar(select(User).where(User.email == email))
+    if existing:
+        if existing.tier != "admin":
+            existing.tier = "admin"
+            db.add(existing)
+            db.commit()
+            print(f"  Promoted {email} to admin")
+        else:
+            print(f"  Admin already exists: {email}")
+    else:
+        user = User(
+            email=email,
+            name="Admin",
+            hashed_password=hash_password(password),
+            tier="admin",
+        )
+        db.add(user)
+        db.commit()
+        print(f"  Created admin user: {email}")
 
 
 def seed():
@@ -57,6 +91,8 @@ def seed():
 
         db.commit()
         print("Seed complete.")
+
+        _seed_admin(db)
     finally:
         db.close()
 

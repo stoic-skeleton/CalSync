@@ -3,11 +3,12 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
-from app.models import CalendarFeed, Event
+from app.models import CalendarFeed, Event, User
+from app.dependencies import get_current_user, require_admin
 from app.schemas import FeedCreateRequest, FeedCreateResponse
 from app.config import settings
 from app.services.ics_generator import build_ics
@@ -24,7 +25,31 @@ except Exception:
 
 
 @router.post("/api/feeds", response_model=FeedCreateResponse)
-def create_feed(body: FeedCreateRequest, db: Session = Depends(get_db)):
+def create_feed(
+    body: FeedCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a calendar feed and associate it with the authenticated user.
+
+    Anonymous feed creation is no longer allowed; callers must be authenticated.
+    Freemium users are limited to 3 feeds.
+    """
+    # Enforce freemium limits
+    FREEMIUM_MAX_LEAGUES = 3
+    FREEMIUM_MAX_FEEDS = 3
+    if current_user.tier == "freemium":
+        if len(body.league_ids) > FREEMIUM_MAX_LEAGUES:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free plan supports up to {FREEMIUM_MAX_LEAGUES} leagues per feed. Upgrade to Pro for unlimited leagues.",
+            )
+        existing_count = db.scalar(
+            select(func.count()).select_from(CalendarFeed).where(CalendarFeed.user_id == current_user.id)
+        ) or 0
+        if int(existing_count) >= FREEMIUM_MAX_FEEDS:
+            raise HTTPException(status_code=403, detail="Free plan limit: upgrade to Pro to create more calendar feeds.")
+
     feed_hash = CalendarFeed.make_hash(body.league_ids, body.team_ids)
 
     feed = db.scalar(select(CalendarFeed).where(CalendarFeed.feed_hash == feed_hash))
@@ -34,6 +59,7 @@ def create_feed(body: FeedCreateRequest, db: Session = Depends(get_db)):
             league_ids=body.league_ids,
             team_ids=body.team_ids,
             reminder_minutes=body.reminder_minutes,
+            user_id=current_user.id,
         )
         db.add(feed)
         db.commit()
@@ -163,7 +189,7 @@ def serve_ics(feed_hash: str, db: Session = Depends(get_db)):
 
 
 @router.get("/api/admin/feeds")
-def admin_list_feeds(db: Session = Depends(get_db)):
+def admin_list_feeds(db: Session = Depends(get_db), _admin = Depends(require_admin)):
     feeds = db.scalars(select(CalendarFeed).order_by(CalendarFeed.created_at.desc())).all()
     out = []
     now = datetime.now(timezone.utc)

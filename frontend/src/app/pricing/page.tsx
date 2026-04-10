@@ -1,25 +1,33 @@
+import React from "react";
 import Link from "next/link";
 import { Check, X, Zap, Users, CalendarDays } from "lucide-react";
+import PricingCta from "@/components/pricing-cta";
+import FreemiumUpgradeBanner from "@/components/freemium-upgrade-banner";
 
 export const metadata = {
   title: "Pricing — CalSync",
   description: "Simple, transparent pricing for CalSync. Start free and upgrade for more leagues and faster refresh rates.",
 };
 
-const PLANS = [
+const PLANS: Array<{
+  name: string;
+  price: string;
+  period: string;
+  tagline: string;
+  popular?: boolean;
+  ctaKey: "free" | "pro" | "team";
+  icon: React.ReactNode;
+  features: { text: string; included: boolean }[];
+}> = [
   {
     name: "Free",
     price: "$0",
     period: "forever",
     tagline: "Perfect for casual fans",
-    accent: "var(--border)",
-    accentText: "var(--muted)",
-    cta: "Get Started",
-    ctaHref: "/browse",
-    ctaStyle: "outline",
+    ctaKey: "free",
     icon: <CalendarDays size={20} />,
     features: [
-      { text: "Up to 3 leagues", included: true },
+      { text: "Up to 3 leagues per feed", included: true },
       { text: "Whole-league calendar feeds", included: true },
       { text: "Refreshed every 6 hours", included: true },
       { text: "Works with any .ics app", included: true },
@@ -34,12 +42,8 @@ const PLANS = [
     price: "$4",
     period: "/ month",
     tagline: "For the die-hard fan",
-    accent: "var(--accent)",
-    accentText: "white",
-    cta: "Start Free Trial",
-    ctaHref: "/browse",
-    ctaStyle: "filled",
     popular: true,
+    ctaKey: "pro",
     icon: <Zap size={20} />,
     features: [
       { text: "Unlimited leagues", included: true },
@@ -57,11 +61,7 @@ const PLANS = [
     price: "$12",
     period: "/ month",
     tagline: "For clubs, newsrooms & more",
-    accent: "var(--foreground)",
-    accentText: "var(--background)",
-    cta: "Contact Us",
-    ctaHref: "mailto:hello@calsync.app",
-    ctaStyle: "dark",
+    ctaKey: "team",
     icon: <Users size={20} />,
     features: [
       { text: "Everything in Pro", included: true },
@@ -115,6 +115,10 @@ export default function PricingPage() {
   return (
     <div className="flex flex-col flex-1" style={{ background: "var(--background)" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+
+      {/* Freemium upgrade banner — only visible when logged in as freemium */}
+      <FreemiumUpgradeBanner />
+
       {/* ── Header ── */}
       <section className="relative overflow-hidden px-4 pt-20 pb-16 text-center">
         <div
@@ -202,19 +206,7 @@ export default function PricingPage() {
                   </div>
 
                   {/* CTA */}
-                  <Link
-                    href={plan.ctaHref}
-                    className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-90 active:scale-95 mb-6"
-                    style={
-                      plan.ctaStyle === "filled"
-                        ? { background: "var(--accent)", color: "white", boxShadow: "0 4px 16px rgba(108,71,255,0.35)" }
-                        : plan.ctaStyle === "dark"
-                        ? { background: "var(--foreground)", color: "var(--background)" }
-                        : { background: "transparent", color: "var(--foreground)", border: "1.5px solid var(--border)" }
-                    }
-                  >
-                    {plan.cta}
-                  </Link>
+                  <PricingCta plan={plan.ctaKey} />
 
                   {/* Features */}
                   <ul className="space-y-2.5">

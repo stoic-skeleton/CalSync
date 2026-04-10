@@ -45,6 +45,8 @@ services:
       CORS_ORIGINS: http://localhost:3000
       ENVIRONMENT: development
       LOG_LEVEL: INFO
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: changeme123
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,6 +66,9 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Force polling so Next.js picks up file changes on Windows Docker volumes
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     depends_on:
       - backend
     volumes:
