@@ -38,12 +38,13 @@ def login(payload: UserLogin, response: Response, db: Session = Depends(get_db))
     if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": str(user.id)})
+    is_prod = settings.environment == "production"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=(settings.environment == "production"),
-        samesite="lax",
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )
@@ -108,12 +109,13 @@ async def google_callback(request: Request, code: str | None = None, db: Session
     token = create_access_token({"sub": str(user.id)})
     redirect = settings.frontend_url or "/"
     response = RedirectResponse(redirect)
+    is_prod = settings.environment == "production"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=token,
         httponly=True,
-        secure=(settings.environment == "production"),
-        samesite="lax",
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )
