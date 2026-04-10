@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { registerUser } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search?.get("next") ?? "/";
@@ -70,5 +70,13 @@ export default function RegisterPage() {
         <Link href="/login" className="font-medium" style={{ color: "var(--accent)" }}>Sign in</Link>
       </p>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }
