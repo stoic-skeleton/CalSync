@@ -187,7 +187,7 @@ export default function AdminPage() {
                       <select
                         value={u.tier}
                         onChange={(e) => confirmChangeTier(u.id, e.target.value, u.tier, u.email)}
-                        disabled={updatingUser === u.id || (user && user.id === u.id)}
+                        disabled={updatingUser === u.id || user?.id === u.id}
                         className="input"
                         style={{ width: 140 }}
                       >
@@ -201,7 +201,7 @@ export default function AdminPage() {
                     </td>
                     <td className="py-3">{new Date(u.created_at).toLocaleDateString()}</td>
                     <td className="py-3">
-                      {user && user.id === u.id ? (
+                      {user?.id === u.id ? (
                         <span className="px-3 py-1 rounded" style={{ background: "var(--surface)" }}>You</span>
                       ) : (
                         <button
