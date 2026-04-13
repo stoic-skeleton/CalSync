@@ -63,3 +63,4 @@ redis_data/
 
 # Alembic — keep versions but ignore __pycache__
 backend/alembic/versions/__pycache__/
+google_auth.json

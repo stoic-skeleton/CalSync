@@ -112,8 +112,8 @@ async def google_callback(request: Request, code: str | None = None, db: Session
             db.refresh(user)
 
     token = create_access_token({"sub": str(user.id)})
-    redirect = settings.frontend_url or "/"
-    response = RedirectResponse(redirect)
+    frontend = (settings.frontend_url or "").rstrip("/")
+    response = RedirectResponse(f"{frontend}/auth/callback?token={token}")
     is_prod = settings.environment == "production"
     response.set_cookie(
         key=settings.session_cookie_name,

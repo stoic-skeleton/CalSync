@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
+from urllib.parse import urlencode
 
 import httpx
 from jose import JWTError, jwt
@@ -60,7 +61,7 @@ def get_google_auth_url(state: Optional[str] = None) -> str:
     if state:
         params["state"] = state
     url = "https://accounts.google.com/o/oauth2/v2/auth"
-    return httpx.URL(url).include_query_params(**params).human_repr()
+    return f"{url}?{urlencode(params)}"
 
 
 async def exchange_google_code(code: str) -> dict[str, Any]:
