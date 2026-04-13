@@ -61,14 +61,35 @@ class SportAdapter(ABC):
 - **Cap:** 100 events max
 - **Retry:** Exponential backoff, 4 attempts (handles DNS failures at Docker cold-start)
 
-### IPLAdapter (``)
-- **API:** TheSportsDB (`https://www.thesportsdb.com/api/v1/json/3`)
+### IPLAdapter (`ipl.py`)
+- **API:** CricAPI (`https://api.cricapi.com/v1`)
 - **`league_slug`:** `"ipl"`
-- **League ID:** `IPL_LEAGUE_ID = "4460"` (Indian Premier League Cricket — confirmed correct)
-- **Teams:** Extracted from events payload (the `lookup_all_teams` endpoint is broken on the free tier)
-- **Events:** Fetches seasons `["2026", "2025"]`, deduplicates by `idEvent`
-- **Status logic:** "postponed" if `strPostponed == "yes"`, "completed" if scores present, else "scheduled"
-- **Known limitation:** TheSportsDB adds fixtures incrementally — early season may have fewer events
+- **Auth:** `CRICAPI_KEY` environment variable
+- **Series ID:** `IPL_SERIES_ID = "87c62aac-bc3c-4738-ab93-19da0690488f"` (Indian Premier League 2026 — update each year)
+- **Teams:** Extracted from match `name` field (`"Team A vs Team B, Nth Match, ..."`) — deduped by lowercase name
+- **Team logos:** Static dict (`_TEAM_LOGOS`) keyed by substring of team name; CDN is `r2.thesportsdb.com`
+- **Events:** Fetches `GET /series_info?apikey=KEY&id=SERIES_ID` → `data.matchList`
+- **Event ID format:** `f"ipl-{match_id}"`
+- **Status logic:** `"completed"` if `matchEnded == True`, else `"scheduled"`
+- **Known limitation:** Requires a valid `CRICAPI_KEY` (100 calls/day on free tier). Without it, ingest is skipped with a warning.
+
+### PremierLeagueAdapter (`espn.py`)
+- **API:** ESPN unofficial (`https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1`)
+- **`league_slug`:** `"premier-league"`
+- **`days_ahead`:** 240
+- Follows the same `ESPNAdapter` base as NFL/NBA/MLS.
+
+### ICCMensT20Adapter / ICCWomensT20Adapter (`icc.py`)
+- **API:** CricAPI (`https://api.cricapi.com/v1`)
+- **`league_slug`:** `"icc-mens-t20-wc"` / `"icc-womens-t20-wc"`
+- **Auth:** `CRICAPI_KEY` (shared with IPL adapter)
+- **Series IDs** (valid April 2026; update each cycle):
+  - Men's T20 WC 2026: `5978f057-af70-4dcf-b9ee-04831b8df947` (55 matches, Feb–Mar 2026)
+  - Women's T20 WC 2026: `f3e5c7dd-332c-4893-9067-aa2bfe6d2b85` (33 matches, Jun–Jul 2026)
+  - Override via `ICC_MENS_T20_SERIES_ID` / `ICC_WOMENS_T20_SERIES_ID` env vars without a code deploy
+- **Teams:** Extracted from match names; national team logos not available via CricAPI — `logo_url = None`
+- **Event ID format:** `f"icc-{match_id}"`
+- **Base class:** `_CricAPISeriesAdapter` (shared logic with IPL adapter pattern)
 
 ### NFLAdapter / NBAAdapter / MLSAdapter (`espn.py`)
 - **API:** ESPN unofficial scoreboard API
@@ -106,9 +127,17 @@ class SportAdapter(ABC):
 
 ## Scheduler (`scheduler.py`)
 
-All adapters are instantiated once at module import:
+All adapters are instantiated fresh on each run (to reset internal caches):
 ```python
-ADAPTERS = [F1Adapter(), IPLAdapter(), NFLAdapter(), NBAAdapter(), MLSAdapter()]
+ADAPTERS = [
+    F1Adapter(),
+    IPLAdapter(),
+    NFLAdapter(),
+    NBAAdapter(),
+    MLSAdapter(),
+    ICCMensT20Adapter(),
+    ICCWomensT20Adapter(),
+]
 ```
 
 `_run_all_ingestions()` iterates `ADAPTERS` sequentially and calls `ingest_league()` for each. A failure in one adapter is logged and does not stop others.
@@ -128,9 +157,9 @@ ADAPTERS = [F1Adapter(), IPLAdapter(), NFLAdapter(), NBAAdapter(), MLSAdapter()]
 1. Create `backend/app/services/data_pipeline/{league}.py` extending `SportAdapter`.
 2. Set `league_slug` to match a slug in the `leagues` table.
 3. Implement `fetch_teams()` and `fetch_events()` returning `list[RawTeam]` and `list[RawEvent]`.
-4. Add the adapter to `ADAPTERS` in `backend/app/services/scheduler.py`.
-5. Add a seed entry to `backend/app/seed.py`.
-6. If team logos come from a new image CDN, add the hostname to `frontend/next.config.ts` under `remotePatterns`.
+4. Add the adapter to the list returned by `_build_adapters()` in `backend/app/services/scheduler.py`.
+5. Add a seed entry (with `logo_url`) to `backend/app/seed.py`.
+6. All image components use native `<img>` tags — no hostname allowlist changes needed.
 
 ---
 

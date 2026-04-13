@@ -6,7 +6,10 @@
 |-----------|------------------|---------------------------------------------------------|----------|------|
 | Formula 1 | OpenF1           | `https://api.openf1.org/v1`                             | None     | Free |
 | F1 Teams  | ESPN (fallback)  | `https://site.api.espn.com/apis/site/v2/sports/racing/f1` | None  | Free |
-| IPL       | TheSportsDB      | `https://www.thesportsdb.com/api/v1/json/3`             | None (key `3` = free tier) | Free |
+| IPL       | CricAPI          | `https://api.cricapi.com/v1`                            | API key  | Free (100 calls/day) |
+| ICC Men's T20 WC | CricAPI | `https://api.cricapi.com/v1`                           | API key  | Free (shared with IPL) |
+| ICC Women's T20 WC | CricAPI | `https://api.cricapi.com/v1`                        | API key  | Free (shared with IPL) |
+| Premier League | ESPN (unofficial) | `https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1` | None | Free |
 | NFL       | ESPN (unofficial)| `https://site.api.espn.com/apis/site/v2/sports/football/nfl` | None | Free |
 | NBA       | ESPN (unofficial)| `https://site.api.espn.com/apis/site/v2/sports/basketball/nba` | None | Free |
 | MLS       | ESPN (unofficial)| `https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1` | None | Free |
@@ -69,56 +72,69 @@ The adapter uses exponential backoff (`_get_with_retry`) with 4 attempts and del
 
 ---
 
-## IPL — TheSportsDB
+## IPL / ICC — CricAPI
 
-**Docs:** https://www.thesportsdb.com/api.php  
-**Base:** `https://www.thesportsdb.com/api/v1/json/3`  
-**Auth:** API key `3` embedded in URL path (free tier).
+**Docs:** https://cricapi.com/cricapi/apis/  
+**Base:** `https://api.cricapi.com/v1`  
+**Auth:** API key passed as `?apikey=KEY` query param. Set `CRICAPI_KEY` in environment.
 
-### League Identifier
-- **`IPL_LEAGUE_ID = "4460"`** — Indian Premier League (Cricket)
-- **Warning:** ID `4792` is a football league. ID `4452` was also tried in earlier sessions. `4460` is the confirmed correct IPL ID verified via `search_all_leagues`.
+**Free tier limits:** 100 calls/day. The IPL and both ICC adapters share this quota.
+
+### Series IDs (update each cycle)
+
+| Series | ID | Matches |
+|--------|----|--------|
+| IPL 2026 | `87c62aac-bc3c-4738-ab93-19da0690488f` | 70 |
+| ICC Men's T20 WC 2026 | `5978f057-af70-4dcf-b9ee-04831b8df947` | 55 |
+| ICC Women's T20 WC 2026 | `f3e5c7dd-332c-4893-9067-aa2bfe6d2b85` | 33 |
+
+To find series IDs for a new season:
+```
+GET https://api.cricapi.com/v1/series?apikey=KEY&search=Indian+Premier+League
+GET https://api.cricapi.com/v1/series?apikey=KEY&search=ICC
+```
+
+Series IDs can also be overridden at runtime via environment variables (`ICC_MENS_T20_SERIES_ID`, `ICC_WOMENS_T20_SERIES_ID`) without a code deploy.
 
 ### Endpoints Used
 
-#### `GET /eventsseason.php?id={IPL_LEAGUE_ID}&s={season}`
-Returns all matches for a given season year.
+#### `GET /series_info?apikey={KEY}&id={SERIES_ID}`
+Returns full match list for a series.
 
-**Key response fields:**
+**Key response structure:**
 ```json
 {
-  "idEvent": "1234567",
-  "strEvent": "Mumbai Indians vs Chennai Super Kings",
-  "dateEvent": "2026-04-05",
-  "strTime": "14:00:00",
-  "idHomeTeam": "133600",
-  "strHomeTeam": "Mumbai Indians",
-  "strHomeTeamBadge": "https://www.thesportsdb.com/images/media/team/badge/...",
-  "idAwayTeam": "133601",
-  "strAwayTeam": "Chennai Super Kings",
-  "strAwayTeamBadge": "https://...",
-  "intHomeScore": null,
-  "intAwayScore": null,
-  "strVenue": "Wankhede Stadium",
-  "strCity": "Mumbai",
-  "strTVStation": "Star Sports",
-  "strPostponed": "no"
+  "status": "success",
+  "data": {
+    "info": { "name": "Indian Premier League 2026" },
+    "matchList": [
+      {
+        "id": "abc123",
+        "name": "Mumbai Indians vs Chennai Super Kings, 1st Match, Indian Premier League 2026",
+        "dateTimeGMT": "2026-03-22T14:00:00",
+        "teams": ["Mumbai Indians", "Chennai Super Kings"],
+        "venue": "Wankhede Stadium",
+        "matchStarted": false,
+        "matchEnded": false
+      }
+    ]
+  }
 }
 ```
 
-**Seasons fetched:** `["2026", "2025"]` — both seasons fetched and deduplicated by `idEvent` to maximise coverage (TheSportsDB adds fixtures incrementally).
+**Status mapping:**
+| `matchEnded` | CalSync `status` |
+|---|---|
+| `true` | `"completed"` |
+| `false` | `"scheduled"` |
 
-### Known Quirks and Limitations
+### IPL Team Logos
+Logo URLs are hardcoded in `_TEAM_LOGOS` in `ipl.py`, keyed by substring of team name. CDN host is `r2.thesportsdb.com`. This avoids extra API calls and bypasses the CricAPI free tier quota.
 
-1. **`lookup_all_teams` is broken on free tier** — Returns random/incorrect data when called with the free API key `3`. Do not use. Teams are extracted from the events payload instead (each event carries `idHomeTeam`, `strHomeTeam`, `strHomeTeamBadge`, etc.).
+> **Note:** TheSportsDB migrated their CDN from `www.thesportsdb.com` to `r2.thesportsdb.com` in early 2026. Team badge URLs must use the `r2.` subdomain or they return 404.
 
-2. **`eventsnextleague` ignores the `id` param** — Also unreliable on free tier. Use `eventsseason` instead.
-
-3. **Incremental fixture addition** — TheSportsDB adds IPL fixtures incrementally as the tournament progresses. Early in the season, only the first few weeks may be available.
-
-4. **Time zone**: All times are UTC. `strTime` may be `null` for some entries — default to `"00:00:00"`.
-
-5. **Image hostname** — Team badge URLs come from `www.thesportsdb.com` and `r2.thesportsdb.com`. Both must be in `next.config.ts` `remotePatterns` for `next/image` to work.
+### National Team Logos (ICC)
+CricAPI does not provide national team badge images. ICC adapter sets `logo_url = None`; the frontend falls back to the cricket emoji via `LogoImage`'s `onError` handler.
 
 ---
 
@@ -139,6 +155,7 @@ https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/teams
 | NFL    | `football`     | `nfl`         | 300          |
 | NBA    | `basketball`   | `nba`         | 90           |
 | MLS    | `soccer`       | `usa.1`       | 240          |
+| Premier League | `soccer` | `eng.1`     | 240          |
 
 ### Endpoints Used
 
@@ -220,12 +237,7 @@ Returns all teams for a league.
 ```
 
 ### Image Hostnames
-ESPN logo URLs come from several CDN subdomains. All must be in `next.config.ts`:
-- `a.espncdn.com`
-- `a1.espncdn.com`
-- `a2.espncdn.com`
-- `a4.espncdn.com`
-- `**.espncdn.com` (wildcard catches future subdomains)
+ESPN logo URLs come from several CDN subdomains. All image components use native `<img>` tags (not `next/image`) so no hostname allowlist is required.
 
 ---
 

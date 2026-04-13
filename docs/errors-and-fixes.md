@@ -16,25 +16,9 @@ hostname "r2.thesportsdb.com" is not configured under `images` in your `next.con
 
 **Cause:** `next/image` requires all external image hostnames to be explicitly allowlisted.
 
-**Fix:** Added to `frontend/next.config.ts`:
-```typescript
-const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "**.thesportsdb.com" },
-      { protocol: "https", hostname: "**.espncdn.com" },
-      { protocol: "https", hostname: "a.espncdn.com" },
-      { protocol: "https", hostname: "a1.espncdn.com" },
-      { protocol: "https", hostname: "a2.espncdn.com" },
-      { protocol: "https", hostname: "a4.espncdn.com" },
-      { protocol: "https", hostname: "**.jolpica.com" },
-      { protocol: "https", hostname: "**.formula1.com" },
-    ],
-  },
-};
-```
+**Fix:** All image components (`LeagueCard`, `EventCard`, `TeamCard`, `LogoImage` in `sport-filter.tsx`) were switched from `next/image` to native `<img>` tags with an `onError` fallback to a sport emoji. This completely eliminates the hostname restriction problem.
 
-**Rule:** Any time a new sports API is added whose images will be rendered via `next/image`, add its CDN hostname(s) to this list.
+**Rule:** Do not use `next/image` for league or team logos from external sports APIs. Use native `<img>` with `onError` emoji fallback.
 
 ---
 
@@ -123,7 +107,68 @@ GET https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?s=cricket&c
 
 ---
 
-### ❌ IPL only returning 9 upcoming events
+### ❌ Mobile sign-in not working (iOS Safari / cross-origin cookies)
+
+**Symptom:** Users can create an account on desktop but cannot sign in on mobile (iOS Safari). The login appears to succeed but the app does not stay authenticated.
+
+**Cause:** iOS Safari's Intelligent Tracking Prevention (ITP) blocks `SameSite=None` cookies from cross-origin responses. The backend sets a `calsync_session` httpOnly cookie, but when the frontend is on Vercel and the backend is on Railway (different origins), Safari silently discards it.
+
+**Fix (two-part):**
+
+1. **Frontend** (`api.ts`, `auth-provider.tsx`):
+   - Store the JWT in `localStorage` under a namespaced key after login.
+   - Inject `Authorization: Bearer <token>` header on every `apiFetch` call.
+   - On mount, skip the `/api/users/me` call entirely if no token is in `localStorage`.
+
+2. **Backend** (`dependencies.py`):
+   - `_get_token_from_request` now checks the `Authorization: Bearer` header as a fallback if no cookie is present.
+
+**Why keep cookies too?** Desktop browsers still send the httpOnly cookie correctly. Keeping both paths means desktop auth is unchanged and mobile gets the header-based fallback.
+
+---
+
+### ❌ TheSportsDB team badge CDN returns 404
+
+**Symptom:** IPL team logos broken — all `www.thesportsdb.com/images/media/team/badge/*.png` URLs return 404.
+
+**Cause:** TheSportsDB migrated their image CDN from `www.thesportsdb.com` to `r2.thesportsdb.com` in early 2026. Old URLs are no longer served.
+
+**Fix:** Updated all `_TEAM_LOGOS` entries in `backend/app/services/data_pipeline/ipl.py` to use the `r2.thesportsdb.com` domain. Verify via:
+```powershell
+docker compose exec backend python -c "import httpx; r = httpx.get('https://r2.thesportsdb.com/images/media/team/badge/l40j8p1487678631.png', follow_redirects=True); print(r.status_code)"
+```
+
+---
+
+### ❌ IPL/ICC events not ingesting (field name bug)
+
+**Symptom:** IPL and ICC adapters run without errors but no events appear in the database, or events are created with no team associations.
+
+**Cause:** `RawEvent` fields are `home_team_external_id` / `away_team_external_id`, but the adapters were using the wrong names `home_team_ext_id` / `away_team_ext_id`. Because Pydantic ignores extra fields by default, no error was raised.
+
+**Fix:** Corrected to `home_team_external_id` / `away_team_external_id` in both `ipl.py` and `icc.py`.
+
+---
+
+### ❌ Seed upsert not updating existing rows
+
+**Symptom:** After changing `logo_url` or other league fields in `seed.py` and restarting the container (without `-v`), the DB still shows old values.
+
+**Cause:** The seed upsert only inserted new rows; it had no update branch for rows that already existed.
+
+**Fix:** Added an update branch to the seed upsert: when a league with the same `slug` already exists, it now updates `name`, `country`, `data_source`, and `logo_url`.
+
+---
+
+### ❌ IPL adapter migrated from TheSportsDB to CricAPI
+
+**Background:** The original `IPLAdapter` used TheSportsDB (`/api/v1/json/3`). This was replaced because:
+- TheSportsDB adds IPL fixtures incrementally; only ~9 upcoming events were available early season.
+- The `lookup_all_teams` endpoint was unreliable on the free tier.
+
+**Current implementation:** CricAPI `GET /series_info?apikey=KEY&id=SERIES_ID` returns the full 70-match schedule from day one. Requires `CRICAPI_KEY` env var (100 calls/day free tier).
+
+**Do not reintroduce TheSportsDB for IPL.** See `docs/apis.md` for the current CricAPI reference.
 
 **Cause:** TheSportsDB adds IPL fixtures incrementally as the tournament schedule is confirmed. Early in the season (or before the season is announced), only the first few rounds are available.
 

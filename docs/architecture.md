@@ -16,6 +16,7 @@ CalSync is a free sports calendar sync service. Users browse leagues and teams, 
 | Cache       | Redis 7                                                 |
 | Scheduling  | APScheduler (runs inside FastAPI process)               |
 | Calendar    | `icalendar` Python library — RFC 5545-compliant `.ics`  |
+| Auth        | JWT (httpOnly cookie + `localStorage` fallback for mobile) |
 | Orchestration | Docker Compose                                        |
 
 ---
@@ -44,8 +45,9 @@ calsync/
 │   │       ├── data_pipeline/
 │   │       │   ├── base.py     # Abstract SportAdapter + RawEvent/RawTeam dataclasses
 │   │       │   ├── f1.py       # F1Adapter — OpenF1 API
-│   │       │   ├── ipl.py      # IPLAdapter — TheSportsDB API
-│   │       │   └── espn.py     # ESPNAdapter base + NFL/NBA/MLS concrete classes
+│   │       │   ├── ipl.py      # IPLAdapter — CricAPI
+│   │       │   ├── icc.py      # ICCMensT20Adapter + ICCWomensT20Adapter — CricAPI
+│   │       │   └── espn.py     # ESPNAdapter base + NFL/NBA/MLS/PremierLeague classes
 │   │       ├── ingest.py       # Upserts RawTeam/RawEvent into PostgreSQL
 │   │       ├── ics_generator.py # Builds RFC 5545 .ics bytes from Event rows
 │   │       └── scheduler.py    # APScheduler — refresh every 6h + 12:00/18:00 UTC
@@ -65,8 +67,13 @@ calsync/
 │   │   │   ├── team-card.tsx
 │   │   │   ├── event-card.tsx
 │   │   │   ├── calendar-link-modal.tsx  # Google/Apple/Outlook subscribe links
-│   │   │   ├── sport-filter.tsx
-│   │   │   └── theme-toggle.tsx
+│   │   │   ├── sport-filter.tsx         # LogoImage helper uses native <img>
+│   │   │   ├── theme-toggle.tsx
+│   │   │   ├── auth-provider.tsx        # JWT auth context; localStorage fallback
+│   │   │   └── calendar/
+│   │   │       ├── MonthCalendar.tsx    # Month grid with navigation + event dots
+│   │   │       ├── WeekStrip.tsx        # Horizontal week strip (mobile)
+│   │   │       └── EventList.tsx        # Event list for a selected date
 │   │   └── lib/                # API client helpers, types
 │   ├── next.config.ts          # Image hostname allowlist
 │   └── Dockerfile
@@ -82,13 +89,14 @@ calsync/
 External APIs          Backend                        Frontend
 ─────────────          ───────                        ────────
 OpenF1            ──►  F1Adapter
-TheSportsDB       ──►  IPLAdapter  ──►  ingest.py  ──►  PostgreSQL
-ESPN              ──►  ESPNAdapter          │
-                                            │  (every 6h via APScheduler)
-                                            ▼
+CricAPI           ──►  IPLAdapter         ──►  ingest.py  ──►  PostgreSQL
+CricAPI           ──►  ICCMensT20Adapter          │
+CricAPI           ──►  ICCWomensT20Adapter         │
+ESPN              ──►  ESPNAdapter (NFL/NBA/MLS)   │  (every 6h via APScheduler)
+                                                   ▼
                         GET /api/leagues  ◄─── Browse page
                         GET /api/teams    ◄─── League detail / team filter
-                        GET /api/events   ◄─── Schedule page
+                        GET /api/events   ◄─── Schedule page (list + calendar view)
                         POST /api/feeds   ◄─── Get Calendar page
                               │  (pre-warms Redis cache immediately)
                               ▼
@@ -188,13 +196,18 @@ ESPN              ──►  ESPNAdapter          │
 
 ## Environment Variables (Backend)
 
-| Variable       | Default                                     | Description             |
-|----------------|---------------------------------------------|-------------------------|
-| DATABASE_URL   | `postgresql://calsync:calsync@localhost:5432/calsync` | Postgres DSN   |
-| REDIS_URL      | `redis://localhost:6379/0`                  | Redis connection        |
-| API_BASE_URL   | `http://localhost:8000`                     | Used in feed URL generation |
-| CORS_ORIGINS   | `http://localhost:3000`                     | Comma-separated origins |
-| ENVIRONMENT    | `development`                               |                         |
-| LOG_LEVEL      | `INFO`                                      |                         |
+| Variable             | Default                                     | Description             |
+|----------------------|---------------------------------------------|-------------------------|
+| DATABASE_URL         | `postgresql://calsync:calsync@localhost:5432/calsync` | Postgres DSN   |
+| REDIS_URL            | `redis://localhost:6379/0`                  | Redis connection        |
+| API_BASE_URL         | `http://localhost:8000`                     | Used in feed URL generation |
+| CORS_ORIGINS         | `http://localhost:3000`                     | Comma-separated origins |
+| ENVIRONMENT          | `development`                               |                         |
+| LOG_LEVEL            | `INFO`                                      |                         |
+| SECRET_KEY           | *(required in production)*                  | JWT signing key         |
+| JWT_EXPIRE_MINUTES   | `10080` (7 days)                            | JWT token lifetime      |
+| CRICAPI_KEY          | *(required for IPL + ICC)*                  | CricAPI key from cricapi.com |
+| GOOGLE_CLIENT_ID     | *(optional)*                                | Google OAuth client ID  |
+| GOOGLE_CLIENT_SECRET | *(optional)*                                | Google OAuth client secret |
 
 Redis is optional — the app falls back gracefully to no-cache mode if Redis is unavailable.

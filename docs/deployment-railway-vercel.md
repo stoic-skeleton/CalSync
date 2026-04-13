@@ -48,6 +48,8 @@ Railway → backend service → **Variables** tab:
 | `LOG_LEVEL`    | `INFO`                                               |
 | `API_BASE_URL` | `https://<your-backend-railway-domain>` ← set after domain is generated |
 | `CORS_ORIGINS` | `https://<your-vercel-domain>` ← set after Vercel deploys |
+| `SECRET_KEY`   | *(generate a long random string — required for JWT signing)* |
+| `CRICAPI_KEY`  | *(your key from cricapi.com — required for IPL + ICC)* |
 
 ### Step 5 — Generate a public domain
 Railway → backend service → **Settings** → **Networking** → **Generate Domain**
@@ -106,8 +108,9 @@ After deployment, check each of these in order:
    → {"status":"ok","environment":"production"}
 
 2. GET https://<railway-backend>/api/leagues
-   → JSON array with 5 leagues (F1, IPL, NFL, NBA, MLS)
+   → JSON array with 8 leagues (F1, IPL, Premier League, NFL, NBA, MLS, ICC Men's T20 WC, ICC Women's T20 WC)
    → event_count > 0 for each (wait ~60s after deploy for ingestion)
+   → Note: ICC Women's T20 WC 2026 runs Jun–Jul 2026; ICC Men's T20 WC 2026 ran Feb–Mar 2026
 
 3. Open https://<vercel-frontend>/browse
    → Leagues list loads (not placeholder data)
