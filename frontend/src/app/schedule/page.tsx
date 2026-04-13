@@ -95,9 +95,14 @@ export default function SchedulePage() {
   }, [view, selectedDate]);
 
   // Sport-filtered events for calendar components
-  const filteredEvents = sport
+  // Filter by sport; when in calendar view, show upcoming events only
+  const now = Date.now();
+  let filteredEvents = sport
     ? events.filter(e => e.league.sport_type === sport)
     : events;
+  if (view === "calendar") {
+    filteredEvents = filteredEvents.filter(e => new Date(e.start_time).getTime() >= now);
+  }
 
   // Events for the selected date in calendar view
   const selectedDateStr = selectedDate ? new Date(selectedDate).toDateString() : "";

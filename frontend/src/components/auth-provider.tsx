@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { fetchCurrentUser, loginUser, logoutUser } from "@/lib/api";
+import { fetchCurrentUser, loginUser, logoutUser, setStoredToken, getStoredToken } from "@/lib/api";
 import type { User } from "@/lib/types";
 
 type AuthContextType = {
@@ -31,23 +31,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setUser(u);
     } catch {
       setUser(null);
+      // If /me fails, token is invalid — clear it
+      setStoredToken(null);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    refresh();
+    // Only call /me if we have a stored token (avoids unnecessary 401 on every page load)
+    if (getStoredToken()) {
+      refresh();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   async function login(email: string, password: string) {
-    const u = await loginUser({ email, password });
-    await refresh();
-    return u as User;
+    const res = await loginUser({ email, password });
+    // Store token for Authorization header fallback (mobile Safari ITP)
+    setStoredToken(res.access_token);
+    // Set user directly from login response — no extra round-trip needed
+    const { access_token: _, ...userFields } = res;
+    setUser(userFields as User);
+    return userFields as User;
   }
 
   async function doLogout() {
     await logoutUser();
+    setStoredToken(null);
     setUser(null);
   }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { MapPin, Tv, Clock } from "lucide-react";
 import { cn, formatEventTime, formatRelative } from "@/lib/utils";
 import type { Event } from "@/lib/types";
@@ -34,7 +33,8 @@ export default function EventCard({ event, compact = false }: EventCardProps) {
         {/* League logo */}
         <div className="w-8 h-8 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center flex-shrink-0 overflow-hidden mt-0.5">
           {event.league.logo_url ? (
-            <Image src={event.league.logo_url} alt={event.league.name} width={32} height={32} className="object-contain" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={event.league.logo_url} alt={event.league.name} width={32} height={32} className="object-contain" />
           ) : (
             <span className="text-sm">🏆</span>
           )}
@@ -107,7 +107,8 @@ function TeamMini({ team }: { team: NonNullable<Event["home_team"]> }) {
   return (
     <div className="flex items-center gap-1.5 flex-1 min-w-0">
       {team.logo_url ? (
-        <Image src={team.logo_url} alt={team.name} width={20} height={20} className="object-contain flex-shrink-0" />
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={team.logo_url} alt={team.name} width={20} height={20} className="object-contain flex-shrink-0" />
       ) : (
         <div className="w-5 h-5 rounded bg-[var(--surface-hover)] flex-shrink-0" />
       )}

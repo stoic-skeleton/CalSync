@@ -49,6 +49,7 @@ def seed():
                 "sport_type": "motorsport",
                 "country": "International",
                 "data_source": "jolpica",
+                "logo_url": "https://a.espncdn.com/i/teamlogos/leagues/500/f1.png",
             },
             {
                 "name": "IPL",
@@ -56,6 +57,15 @@ def seed():
                 "sport_type": "cricket",
                 "country": "India",
                 "data_source": "thesportsdb",
+                "logo_url": "https://www.google.com/s2/favicons?domain=iplt20.com&sz=256",
+            },
+            {
+                "name": "Premier League",
+                "slug": "premier-league",
+                "sport_type": "soccer",
+                "country": "England",
+                "data_source": "espn",
+                "logo_url": "https://a.espncdn.com/i/teamlogos/soccer/500/eng.1.png",
             },
             {
                 "name": "NFL",
@@ -63,6 +73,7 @@ def seed():
                 "sport_type": "american_football",
                 "country": "USA",
                 "data_source": "espn",
+                "logo_url": "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
             },
             {
                 "name": "NBA",
@@ -70,6 +81,7 @@ def seed():
                 "sport_type": "basketball",
                 "country": "USA",
                 "data_source": "espn",
+                "logo_url": "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
             },
             {
                 "name": "MLS",
@@ -77,6 +89,23 @@ def seed():
                 "sport_type": "soccer",
                 "country": "USA/Canada",
                 "data_source": "espn",
+                "logo_url": "https://a.espncdn.com/i/teamlogos/leagues/500/mls.png",
+            },
+            {
+                "name": "ICC Men's T20 World Cup",
+                "slug": "icc-mens-t20-wc",
+                "sport_type": "cricket",
+                "country": "International",
+                "data_source": "cricapi",
+                "logo_url": "https://www.google.com/s2/favicons?domain=icc-cricket.com&sz=256",
+            },
+            {
+                "name": "ICC Women's T20 World Cup",
+                "slug": "icc-womens-t20-wc",
+                "sport_type": "cricket",
+                "country": "International",
+                "data_source": "cricapi",
+                "logo_url": "https://www.google.com/s2/favicons?domain=icc-cricket.com&sz=256",
             },
         ]
 
@@ -87,7 +116,12 @@ def seed():
                 db.add(League(**data))
                 print(f"  Added league: {data['name']}")
             else:
-                print(f"  League already exists: {data['name']}")
+                # Always update logo_url and metadata so re-seeding keeps things consistent
+                for field in ("name", "logo_url", "country", "data_source"):
+                    if field in data:
+                        setattr(existing, field, data[field])
+                db.add(existing)
+                print(f"  Updated league: {data['name']}")
 
         db.commit()
         print("Seed complete.")

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -29,14 +28,14 @@ export function LogoImage({
   const [errored, setErrored] = useState(false);
   if (errored || !src) return <>{fallback ?? null}</>;
   return (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={src}
       alt={alt}
       width={width}
       height={height}
       className={className}
       onError={() => setErrored(true)}
-      unoptimized
     />
   );
 }

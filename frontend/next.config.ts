@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.formula1.com" },
       // Clearbit Logo API (league + calendar app logos on homepage)
       { protocol: "https", hostname: "logo.clearbit.com" },
+      // Wikimedia uploads (high-res league/team badges hosted on Wikimedia)
+      { protocol: "https", hostname: "upload.wikimedia.org" },
+      // Google Favicons API (used for IPL and other league logos)
+      { protocol: "https", hostname: "www.google.com" },
     ],
   },
 };

@@ -112,6 +112,11 @@ class UserOut(BaseModel):
     created_at: datetime
 
 
+class LoginOut(UserOut):
+    """Login response that includes the JWT token for clients that can't use cookies."""
+    access_token: str
+
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str

@@ -11,16 +11,28 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.services.data_pipeline.f1 import F1Adapter
 from app.services.data_pipeline.ipl import IPLAdapter
 from app.services.data_pipeline.espn import NFLAdapter, NBAAdapter, MLSAdapter
+from app.services.data_pipeline.icc import ICCMensT20Adapter, ICCWomensT20Adapter
 from app.services.ingest import ingest_league
 
 logger = logging.getLogger(__name__)
 
-ADAPTERS = [F1Adapter(), IPLAdapter(), NFLAdapter(), NBAAdapter(), MLSAdapter()]
+
+def _build_adapters():
+    """Create fresh adapter instances each run to reset any internal cache."""
+    return [
+        F1Adapter(),
+        IPLAdapter(),
+        NFLAdapter(),
+        NBAAdapter(),
+        MLSAdapter(),
+        ICCMensT20Adapter(),
+        ICCWomensT20Adapter(),
+    ]
 
 
 async def _run_all_ingestions() -> None:
     logger.info("Starting scheduled ingestion for all leagues…")
-    for adapter in ADAPTERS:
+    for adapter in _build_adapters():
         try:
             await ingest_league(adapter)
         except Exception as e:

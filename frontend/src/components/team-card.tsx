@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { Plus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Team } from "@/lib/types";
@@ -29,7 +28,8 @@ export default function TeamCard({ team, selected = false, onToggle }: TeamCardP
         }}
       >
         {team.logo_url ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={team.logo_url}
             alt={team.name}
             width={36}

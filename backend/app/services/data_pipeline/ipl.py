@@ -11,10 +11,13 @@ TheSportsDB was the previous source but only had ~15 fixtures available
 Series IDs (update each year by querying /v1/series and searching "Indian Premier League"):
   2026: 87c62aac-bc3c-4738-ab93-19da0690488f
 """
+import logging
 import os
 from datetime import datetime, timezone
 import httpx
 from app.services.data_pipeline.base import SportAdapter, RawEvent, RawTeam
+
+logger = logging.getLogger(__name__)
 
 CRICAPI_BASE = "https://api.cricapi.com/v1"
 # Read from env so the key is not hardcoded in source — set CRICAPI_KEY in Railway variables
@@ -47,15 +50,26 @@ def _logo_for(team_name: str) -> str | None:
 class IPLAdapter(SportAdapter):
     league_slug = "ipl"
 
+    def __init__(self) -> None:
+        self._cached_matches: list[dict] | None = None
+
     async def _fetch_match_list(self) -> list[dict]:
+        if self._cached_matches is not None:
+            return self._cached_matches
         if not CRICAPI_KEY:
+            logger.warning("CRICAPI_KEY not set — skipping IPL ingest")
             return []
         url = f"{CRICAPI_BASE}/series_info?apikey={CRICAPI_KEY}&id={IPL_SERIES_ID}"
         async with httpx.AsyncClient(timeout=20) as client:
             res = await client.get(url)
             res.raise_for_status()
         data = res.json()
-        return data.get("data", {}).get("matchList", [])
+        if data.get("status") != "success":
+            logger.warning("CricAPI returned failure for IPL: %s", data.get("reason"))
+            self._cached_matches = []
+            return []
+        self._cached_matches = data.get("data", {}).get("matchList", [])
+        return self._cached_matches
 
     async def fetch_teams(self) -> list[RawTeam]:
         matches = await self._fetch_match_list()

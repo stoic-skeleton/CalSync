@@ -11,7 +11,15 @@ from app.models import User
 
 
 def _get_token_from_request(request: Request) -> str | None:
-    return request.cookies.get(settings.session_cookie_name)
+    # 1. Prefer httpOnly cookie (desktop browsers, same-site)
+    token = request.cookies.get(settings.session_cookie_name)
+    if token:
+        return token
+    # 2. Fall back to Authorization: Bearer header (mobile Safari / cross-origin ITP)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[len("Bearer "):]
+    return None
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:

@@ -4,7 +4,7 @@ from starlette import status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas import UserRegister, UserLogin, UserOut
+from app.schemas import UserRegister, UserLogin, UserOut, LoginOut
 from app.services.auth import hash_password, verify_password, create_access_token, get_google_auth_url, exchange_google_code
 from app.config import settings
 from app.models import User
@@ -30,7 +30,7 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=UserOut)
+@router.post("/login", response_model=LoginOut)
 def login(payload: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email.lower()).one_or_none()
     if not user or not user.hashed_password:
@@ -48,7 +48,12 @@ def login(payload: UserLogin, response: Response, db: Session = Depends(get_db))
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )
-    return user
+    # Return token in body so mobile clients (iOS Safari ITP) can use Authorization header
+    return LoginOut(
+        id=user.id, email=user.email, name=user.name, picture_url=user.picture_url,
+        tier=user.tier, is_active=user.is_active, created_at=user.created_at,
+        access_token=token,
+    )
 
 
 @router.post("/logout")

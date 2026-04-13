@@ -76,6 +76,10 @@ export interface Selection {
   teams: Team[];
 }
 
+export interface LoginResponse extends User {
+  access_token: string;
+}
+
 // ── Auth / Users ───────────────────────────────────────────────────────────
 
 export interface User {

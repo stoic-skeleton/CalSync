@@ -6,6 +6,7 @@ import type {
   FeedCreationResponse,
   PaginatedResponse,
   User,
+  LoginResponse,
   AdminStats,
   AdminUsersResponse,
 } from "./types";
@@ -13,14 +14,34 @@ import type {
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+const TOKEN_KEY = "calsync_token";
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
 async function apiFetch<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     credentials: init?.credentials ?? "same-origin",
     ...init,
+    headers,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -97,7 +118,7 @@ export function registerUser(payload: RegisterPayload) {
 }
 
 export function loginUser(payload: LoginPayload) {
-  return apiFetch<User>("/api/auth/login", {
+  return apiFetch<LoginResponse>("/api/auth/login", {
     method: "POST",
     credentials: "include",
     body: JSON.stringify(payload),

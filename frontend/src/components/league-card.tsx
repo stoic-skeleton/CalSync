@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Plus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoImage } from "@/components/sport-filter";
 import type { League } from "@/lib/types";
 
 const SPORT_COLORS: Record<string, string> = {
@@ -60,12 +60,13 @@ export default function LeagueCard({
           className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-[var(--surface-hover)] overflow-hidden"
         >
           {league.logo_url ? (
-            <Image
+            <LogoImage
               src={league.logo_url}
               alt={league.name}
               width={48}
               height={48}
               className="object-contain"
+              fallback={<span>{SPORT_EMOJI[league.sport_type] ?? "🏆"}</span>}
             />
           ) : (
             <span>{SPORT_EMOJI[league.sport_type] ?? "🏆"}</span>
