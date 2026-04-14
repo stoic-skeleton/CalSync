@@ -49,7 +49,8 @@ def get_google_auth_url(state: Optional[str] = None) -> str:
     if not settings.google_client_id:
         raise RuntimeError("GOOGLE_CLIENT_ID is not configured")
     redirect_uri = f"{settings.api_base_url.rstrip('/')}" + "/api/auth/google/callback"
-    scope = "openid email profile"
+    # Include calendar scope so we can call the Google Calendar API
+    scope = "openid email profile https://www.googleapis.com/auth/calendar"
     params = {
         "client_id": settings.google_client_id,
         "response_type": "code",

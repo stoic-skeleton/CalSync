@@ -285,21 +285,57 @@ async def add_feed_to_google_calendar(
 
     # Use the Google Calendar API to subscribe to the webcal feed
     async with _httpx.AsyncClient(timeout=15) as client:
-        r = await client.post(
-            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-            },
-            json={"id": webcal_url},
-        )
-
-        if r.status_code == 401:
-            # Token expired — user needs to re-authenticate
-            raise HTTPException(
-                status_code=403,
-                detail="Google access token expired. Please sign out and sign in with Google again.",
+        async def _post_calendar(token: str):
+            return await client.post(
+                "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                json={"id": webcal_url},
             )
+
+        r = await _post_calendar(access_token)
+
+        # 401 -> access token expired: try refreshing using stored refresh token
+        if r.status_code == 401:
+            refresh_token = current_user.google_refresh_token
+            if not refresh_token:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Google access token expired. Please sign out and sign in with Google again.",
+                )
+
+            token_url = "https://oauth2.googleapis.com/token"
+            data = {
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+            }
+            tr = await client.post(token_url, data=data, timeout=10)
+            if tr.status_code == 200:
+                token_data = tr.json()
+                new_access = token_data.get("access_token")
+                if new_access:
+                    # persist new access token and retry calendar API
+                    current_user.google_access_token = new_access
+                    db.add(current_user)
+                    db.commit()
+                    access_token = new_access
+                    r = await _post_calendar(access_token)
+                else:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Google access token refresh failed. Please sign out and sign in with Google again.",
+                    )
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Google access token refresh failed. Please sign out and sign in with Google again.",
+                )
+
+        # 403 indicates missing calendar scope / permission
         if r.status_code == 403:
             raise HTTPException(
                 status_code=403,
