@@ -17,6 +17,8 @@ import type { FeedCreationResponse } from "@/lib/types";
 
 interface CalendarLinkModalProps {
   feed: FeedCreationResponse;
+  lastSyncedAt?: string | null;
+  lastSyncedEventCount?: number | null;
   onClose: () => void;
 }
 
@@ -47,13 +49,26 @@ const PLATFORMS = [
   },
 ];
 
-export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalProps) {
+export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventCount, onClose }: CalendarLinkModalProps) {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [directAdding, setDirectAdding] = useState(false);
   const [directResult, setDirectResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [syncedAt, setSyncedAt] = useState<string | null>(lastSyncedAt ?? null);
+  const [syncedCount, setSyncedCount] = useState<number | null>(lastSyncedEventCount ?? null);
   const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
   const canDirectAdd = !!(user?.google_id);
+
+  function formatSyncTime(iso: string) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMin = Math.round((now.getTime() - d.getTime()) / 60000);
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return `${diffH}h ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
 
   async function handleCopy() {
     const ok = await copyToClipboard(feed.feed_url);
@@ -69,6 +84,12 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
     try {
       const res = await addFeedToGoogle(feed.feed_hash);
       setDirectResult(res);
+      if (res.ok) {
+        if (res.last_synced_at) setSyncedAt(res.last_synced_at);
+        if (res.last_synced_event_count != null) setSyncedCount(res.last_synced_event_count);
+        // Auto-dismiss success after 4s so button reappears for re-sync
+        setTimeout(() => setDirectResult(null), 4000);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setDirectResult({ ok: false, message: msg.includes("403") ? "Calendar permission not granted. Please sign out and sign in with Google again." : msg });
@@ -143,9 +164,16 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
           </button>
         </div>
 
-        {/* Direct Google Calendar add — only for Google users */}
+        {/* Direct Google Calendar add — only for Google-signed-in users */}
         {canDirectAdd && (
           <div className="mb-5">
+            {/* Last synced info */}
+            {syncedAt && !directResult && (
+              <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>
+                Last synced {formatSyncTime(syncedAt)}
+                {syncedCount != null ? ` · ${syncedCount} events` : ""}
+              </p>
+            )}
             {directResult ? (
               <div
                 className={cn(
@@ -176,7 +204,11 @@ export default function CalendarLinkModal({ feed, onClose }: CalendarLinkModalPr
                   </svg>
                 )}
                 <span style={{ color: "var(--foreground)" }}>
-                  {directAdding ? "Adding to Google Calendar…" : "Add directly to Google Calendar"}
+                  {directAdding
+                    ? "Syncing to Google Calendar…"
+                    : syncedAt
+                    ? "Sync again with Google Calendar"
+                    : "Add directly to Google Calendar"}
                 </span>
               </button>
             )}

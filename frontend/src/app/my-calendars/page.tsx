@@ -6,7 +6,7 @@ import { CalendarDays, Loader2, ExternalLink } from "lucide-react";
 import { fetchMyFeeds, fetchLeagues } from "@/lib/api";
 import CalendarLinkModal from "@/components/calendar-link-modal";
 import { useAuth } from "@/components/auth-provider";
-import type { MyFeed, League, FeedCreationResponse } from "@/lib/types";
+import type { MyFeed, League } from "@/lib/types";
 
 const SPORT_EMOJI: Record<string, string> = {
   motorsport: "🏎️",
@@ -29,7 +29,7 @@ export default function MyCalendarsPage() {
   const [feeds, setFeeds] = useState<MyFeed[]>([]);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeFeed, setActiveFeed] = useState<FeedCreationResponse | null>(null);
+  const [activeFeed, setActiveFeed] = useState<MyFeed | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -52,12 +52,7 @@ export default function MyCalendarsPage() {
   }
 
   function openModal(feed: MyFeed) {
-    setActiveFeed({
-      feed_hash: feed.feed_hash,
-      feed_url: feed.feed_url,
-      webcal_url: feed.webcal_url,
-      event_count: feed.event_count,
-    });
+    setActiveFeed(feed);
   }
 
   if (authLoading || loading) {
@@ -166,7 +161,12 @@ export default function MyCalendarsPage() {
       )}
 
       {activeFeed && (
-        <CalendarLinkModal feed={activeFeed} onClose={() => setActiveFeed(null)} />
+        <CalendarLinkModal
+          feed={activeFeed}
+          lastSyncedAt={activeFeed.last_synced_at}
+          lastSyncedEventCount={activeFeed.last_synced_event_count}
+          onClose={() => setActiveFeed(null)}
+        />
       )}
     </div>
   );

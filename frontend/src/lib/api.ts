@@ -109,7 +109,7 @@ export function fetchMyFeeds(): Promise<MyFeed[]> {
   return apiFetch<MyFeed[]>("/api/feeds", { method: "GET", credentials: "include" });
 }
 
-export function addFeedToGoogle(feedHash: string): Promise<{ ok: boolean; message: string }> {
+export function addFeedToGoogle(feedHash: string): Promise<{ ok: boolean; message: string; google_calendar_id?: string; last_synced_at?: string; last_synced_event_count?: number }> {
   return apiFetch(`/api/feeds/${feedHash}/add-to-google`, { method: "POST", credentials: "include" });
 }
 

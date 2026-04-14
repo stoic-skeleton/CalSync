@@ -12,6 +12,7 @@ from app.dependencies import get_current_user, require_admin
 from app.schemas import FeedCreateRequest, FeedCreateResponse, UserFeedOut
 from app.config import settings
 from app.services.ics_generator import build_ics
+from app.services.google_sync import sync_feed_to_google
 
 router = APIRouter(tags=["feeds"])
 
@@ -145,6 +146,9 @@ def list_my_feeds(
             league_ids=f.league_ids or [],
             team_ids=f.team_ids or [],
             reminder_minutes=f.reminder_minutes,
+            google_calendar_id=f.google_calendar_id,
+            last_synced_at=f.last_synced_at,
+            last_synced_event_count=f.last_synced_event_count,
             created_at=f.created_at,
         ))
     return result
@@ -259,93 +263,31 @@ async def add_feed_to_google_calendar(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Push the calendar feed directly into the user's Google Calendar account.
-
-    Requires the user to have authenticated via Google and granted calendar scope.
-    Creates a new calendar subscription in the user's Google Calendar using the Calendar API.
-    """
-    import httpx as _httpx
-
+    """Sync a feed into the user's Google Calendar (creates if needed, then clears & re-inserts)."""
     if not current_user.google_id:
         raise HTTPException(status_code=400, detail="Sign in with Google to use direct calendar add.")
-
-    access_token = current_user.google_access_token
-    if not access_token:
+    if not current_user.google_access_token:
         raise HTTPException(
             status_code=403,
-            detail="Google Calendar access not granted. Please sign out and sign in with Google again to grant calendar permissions.",
+            detail="Google Calendar access not granted. Please sign out and sign in with Google again.",
         )
 
     feed = db.scalar(select(CalendarFeed).where(CalendarFeed.feed_hash == feed_hash))
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
 
-    feed_url = f"{settings.api_base_url}/cal/{feed_hash}.ics"
-    webcal_url = feed_url.replace("http://", "webcal://").replace("https://", "webcal://")
+    try:
+        inserted = await sync_feed_to_google(feed, current_user, db)
+    except ValueError as exc:
+        msg = str(exc)
+        if "permission" in msg.lower() or "403" in msg:
+            raise HTTPException(status_code=403, detail=msg)
+        raise HTTPException(status_code=502, detail=msg)
 
-    # Use the Google Calendar API to subscribe to the webcal feed
-    async with _httpx.AsyncClient(timeout=15) as client:
-        async def _post_calendar(token: str):
-            return await client.post(
-                "https://www.googleapis.com/calendar/v3/users/me/calendarList",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
-                json={"id": webcal_url},
-            )
-
-        r = await _post_calendar(access_token)
-
-        # 401 -> access token expired: try refreshing using stored refresh token
-        if r.status_code == 401:
-            refresh_token = current_user.google_refresh_token
-            if not refresh_token:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Google access token expired. Please sign out and sign in with Google again.",
-                )
-
-            token_url = "https://oauth2.googleapis.com/token"
-            data = {
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-            }
-            tr = await client.post(token_url, data=data, timeout=10)
-            if tr.status_code == 200:
-                token_data = tr.json()
-                new_access = token_data.get("access_token")
-                if new_access:
-                    # persist new access token and retry calendar API
-                    current_user.google_access_token = new_access
-                    db.add(current_user)
-                    db.commit()
-                    access_token = new_access
-                    r = await _post_calendar(access_token)
-                else:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Google access token refresh failed. Please sign out and sign in with Google again.",
-                    )
-            else:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Google access token refresh failed. Please sign out and sign in with Google again.",
-                )
-
-        # 403 indicates missing calendar scope / permission
-        if r.status_code == 403:
-            raise HTTPException(
-                status_code=403,
-                detail="Calendar permission not granted. Please sign out and sign in with Google again to grant calendar permissions.",
-            )
-        if r.status_code not in (200, 201):
-            raise HTTPException(
-                status_code=502,
-                detail=f"Google Calendar API error: {r.status_code}",
-            )
-
-    return {"ok": True, "message": "Calendar added to your Google Calendar."}
+    return {
+        "ok": True,
+        "message": f"{inserted} events synced to Google Calendar.",
+        "google_calendar_id": feed.google_calendar_id,
+        "last_synced_at": feed.last_synced_at.isoformat() if feed.last_synced_at else None,
+    }
 

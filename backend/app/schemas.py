@@ -109,6 +109,9 @@ class UserFeedOut(BaseModel):
     league_ids: list[int]
     team_ids: list[int]
     reminder_minutes: int | None
+    google_calendar_id: str | None
+    last_synced_at: datetime | None
+    last_synced_event_count: int | None
     created_at: datetime
 
 

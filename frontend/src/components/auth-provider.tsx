@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { fetchCurrentUser, loginUser, logoutUser, setStoredToken, getStoredToken } from "@/lib/api";
 import type { User } from "@/lib/types";
 
@@ -24,7 +24,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const u = await fetchCurrentUser();
@@ -36,7 +36,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     } finally {
       setLoading(false);
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   useEffect(() => {
     // Only call /me if we have a stored token (avoids unnecessary 401 on every page load)

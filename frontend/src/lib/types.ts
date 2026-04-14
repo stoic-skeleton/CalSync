@@ -71,6 +71,9 @@ export interface MyFeed {
   league_ids: number[];
   team_ids: number[];
   reminder_minutes: number | null;
+  google_calendar_id: string | null;
+  last_synced_at: string | null;
+  last_synced_event_count: number | null;
   created_at: string;
 }
 

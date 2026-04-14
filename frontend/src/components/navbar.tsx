@@ -81,7 +81,7 @@ function UserMenu() {
           aria-hidden
         >
           {user.picture_url
-            ? <img src={user.picture_url} alt={initials} className="w-8 h-8 rounded-full object-cover" />
+            ? <img src={user.picture_url} alt={initials} referrerPolicy="no-referrer" className="w-8 h-8 rounded-full object-cover" />
             : initials}
         </span>
         <span className="text-sm font-medium text-[var(--foreground)] max-w-[120px] truncate">

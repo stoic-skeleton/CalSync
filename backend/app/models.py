@@ -98,6 +98,9 @@ class CalendarFeed(Base):
     user: Mapped["User | None"] = relationship("User", back_populates="feeds")
     access_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reminder_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    google_calendar_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_synced_event_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     @staticmethod
