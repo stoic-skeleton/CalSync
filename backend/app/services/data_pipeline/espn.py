@@ -174,3 +174,11 @@ class MLSAdapter(ESPNAdapter):
     espn_league = "usa.1"
     # Regular season + playoffs run through ~Nov 2026
     days_ahead = 240
+
+
+class FIFAWorldCupAdapter(ESPNAdapter):
+    league_slug = "fifa-world-cup"
+    espn_sport = "soccer"
+    espn_league = "fifa.world"
+    # Group stage through Final: Jun 11 – Jul 19 2026 (97 days); 120 gives buffer
+    days_ahead = 120

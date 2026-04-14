@@ -107,6 +107,14 @@ def seed():
                 "data_source": "cricapi",
                 "logo_url": "https://www.google.com/s2/favicons?domain=icc-cricket.com&sz=256",
             },
+            {
+                "name": "FIFA World Cup",
+                "slug": "fifa-world-cup",
+                "sport_type": "soccer",
+                "country": "International",
+                "data_source": "espn",
+                "logo_url": "https://a.espncdn.com/i/leaguelogos/soccer/500/4.png",
+            },
         ]
 
         for data in leagues_data:

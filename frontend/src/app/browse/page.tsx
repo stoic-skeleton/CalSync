@@ -365,5 +365,6 @@ const PLACEHOLDER_LEAGUES: League[] = [
   { id: 3, name: "NFL",                  slug: "nfl",               sport_type: "american_football", country: "USA",           logo_url: null, event_count: 272 },
   { id: 4, name: "NBA",                  slug: "nba",               sport_type: "basketball",        country: "USA",           logo_url: null, event_count: 1230 },
   { id: 5, name: "MLS",                  slug: "mls",               sport_type: "soccer",            country: "USA/Canada",    logo_url: null, event_count: 378 },
+  { id: 6, name: "FIFA World Cup",       slug: "fifa-world-cup",    sport_type: "soccer",            country: "International", logo_url: null, event_count: 104 },
 ];
 

@@ -20,6 +20,41 @@ logger = logging.getLogger(__name__)
 CRICAPI_BASE = "https://api.cricapi.com/v1"
 CRICAPI_KEY = os.environ.get("CRICAPI_KEY", "")
 
+# ESPN CDN country logos — keyed by lowercased team name with gender/age suffixes stripped.
+_ICC_COUNTRY_LOGOS: dict[str, str] = {
+    "india":        "https://a.espncdn.com/i/teamlogos/countries/500/ind.png",
+    "england":      "https://a.espncdn.com/i/teamlogos/countries/500/eng.png",
+    "australia":    "https://a.espncdn.com/i/teamlogos/countries/500/aus.png",
+    "new zealand":  "https://a.espncdn.com/i/teamlogos/countries/500/nzl.png",
+    "pakistan":     "https://a.espncdn.com/i/teamlogos/countries/500/pak.png",
+    "south africa": "https://a.espncdn.com/i/teamlogos/countries/500/rsa.png",
+    "bangladesh":   "https://a.espncdn.com/i/teamlogos/countries/500/ban.png",
+    "sri lanka":    "https://a.espncdn.com/i/teamlogos/countries/500/sri.png",
+    "afghanistan":  "https://a.espncdn.com/i/teamlogos/countries/500/afg.png",
+    "zimbabwe":     "https://a.espncdn.com/i/teamlogos/countries/500/zim.png",
+    "ireland":      "https://a.espncdn.com/i/teamlogos/countries/500/irl.png",
+    "scotland":     "https://a.espncdn.com/i/teamlogos/countries/500/sco.png",
+    "netherlands":  "https://a.espncdn.com/i/teamlogos/countries/500/ned.png",
+    "west indies":  "https://a.espncdn.com/i/teamlogos/cricket/500/4.png",
+    "usa":          "https://a.espncdn.com/i/teamlogos/countries/500/usa.png",
+    "canada":       "https://a.espncdn.com/i/teamlogos/countries/500/can.png",
+    "uae":          "https://a.espncdn.com/i/teamlogos/countries/500/uae.png",
+}
+
+
+def _icc_logo_for(team_name: str) -> str | None:
+    """Strip gender/age suffixes then return an ESPN country logo URL."""
+    key = (
+        team_name.lower()
+        .replace(" women", "")
+        .replace(" men", "")
+        .replace(" u19", "")
+        .replace(" xi", "")
+        .strip()
+    )
+    return _ICC_COUNTRY_LOGOS.get(key)
+
+
 # Series IDs — environment variable overrides allow updating without a code deploy
 ICC_MENS_T20_2026_ID = os.environ.get(
     "ICC_MENS_T20_SERIES_ID", "5978f057-af70-4dcf-b9ee-04831b8df947"
@@ -68,7 +103,7 @@ class _CricAPISeriesAdapter(SportAdapter):
                     seen[key] = RawTeam(
                         external_id=f"icc-{key.replace(' ', '-')}",
                         name=team_name,
-                        logo_url=None,  # National team logos not available via CricAPI
+                        logo_url=_icc_logo_for(team_name),
                     )
         return list(seen.values())
 

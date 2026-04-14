@@ -68,13 +68,13 @@ def me(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/google")
-def google_auth():
-    url = get_google_auth_url()
+def google_auth(next: str | None = None):
+    url = get_google_auth_url(state=next)
     return RedirectResponse(url)
 
 
 @router.get("/google/callback")
-async def google_callback(request: Request, code: str | None = None, db: Session = Depends(get_db)):
+async def google_callback(request: Request, code: str | None = None, state: str | None = None, db: Session = Depends(get_db)):
     if not code:
         raise HTTPException(status_code=400, detail="Missing code")
     data = await exchange_google_code(code)
@@ -111,9 +111,26 @@ async def google_callback(request: Request, code: str | None = None, db: Session
             db.commit()
             db.refresh(user)
 
+    # Store Google OAuth tokens so we can call the Calendar API on behalf of the user
+    token_data = data.get("token_data") or {}
+    google_access = token_data.get("access_token")
+    google_refresh = token_data.get("refresh_token")
+    if google_access or google_refresh:
+        if google_access:
+            user.google_access_token = google_access
+        if google_refresh:
+            user.google_refresh_token = google_refresh
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
     token = create_access_token({"sub": str(user.id)})
     frontend = (settings.frontend_url or "").rstrip("/")
-    response = RedirectResponse(f"{frontend}/auth/callback?token={token}")
+    callback_url = f"{frontend}/auth/callback?token={token}"
+    if state:
+        from urllib.parse import quote
+        callback_url += f"&next={quote(state, safe='')}"
+    response = RedirectResponse(callback_url)
     is_prod = settings.environment == "production"
     response.set_cookie(
         key=settings.session_cookie_name,

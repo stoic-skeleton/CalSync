@@ -14,12 +14,12 @@ function CallbackHandler() {
 
   useEffect(() => {
     const token = params?.get("token");
+    const next = params?.get("next") ?? "/";
     if (token) {
       setStoredToken(token);
-      // Refresh auth context so navbar/user state updates immediately
-      refresh().finally(() => router.replace("/"));
+      refresh().finally(() => router.replace(next));
     } else {
-      router.replace("/");
+      router.replace(next);
     }
   }, [params, refresh, router]);
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db import get_db
 from app.models import CalendarFeed, Event, User
 from app.dependencies import get_current_user, require_admin
-from app.schemas import FeedCreateRequest, FeedCreateResponse
+from app.schemas import FeedCreateRequest, FeedCreateResponse, UserFeedOut
 from app.config import settings
 from app.services.ics_generator import build_ics
 
@@ -110,6 +110,44 @@ def create_feed(
         webcal_url=webcal_url,
         event_count=event_count,
     )
+
+
+@router.get("/api/feeds", response_model=list[UserFeedOut])
+def list_my_feeds(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all feeds belonging to the authenticated user, newest first."""
+    feeds = db.scalars(
+        select(CalendarFeed)
+        .where(CalendarFeed.user_id == current_user.id)
+        .order_by(CalendarFeed.created_at.desc())
+    ).all()
+
+    now = datetime.now(timezone.utc)
+    result = []
+    for f in feeds:
+        count_stmt = select(func.count()).select_from(Event).where(Event.start_time >= now)
+        if f.league_ids:
+            count_stmt = count_stmt.where(Event.league_id.in_(f.league_ids))
+        if f.team_ids:
+            count_stmt = count_stmt.where(
+                (Event.home_team_id.in_(f.team_ids)) | (Event.away_team_id.in_(f.team_ids))
+            )
+        event_count = db.scalar(count_stmt) or 0
+        feed_url = f"{settings.api_base_url}/cal/{f.feed_hash}.ics"
+        webcal_url = feed_url.replace("http://", "webcal://").replace("https://", "webcal://")
+        result.append(UserFeedOut(
+            feed_hash=f.feed_hash,
+            feed_url=feed_url,
+            webcal_url=webcal_url,
+            event_count=int(event_count),
+            league_ids=f.league_ids or [],
+            team_ids=f.team_ids or [],
+            reminder_minutes=f.reminder_minutes,
+            created_at=f.created_at,
+        ))
+    return result
 
 
 @router.get("/cal/{feed_hash}.ics")
@@ -213,3 +251,65 @@ def admin_list_feeds(db: Session = Depends(get_db), _admin = Depends(require_adm
         })
 
     return {"items": out, "total": len(out)}
+
+
+@router.post("/api/feeds/{feed_hash}/add-to-google")
+async def add_feed_to_google_calendar(
+    feed_hash: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Push the calendar feed directly into the user's Google Calendar account.
+
+    Requires the user to have authenticated via Google and granted calendar scope.
+    Creates a new calendar subscription in the user's Google Calendar using the Calendar API.
+    """
+    import httpx as _httpx
+
+    if not current_user.google_id:
+        raise HTTPException(status_code=400, detail="Sign in with Google to use direct calendar add.")
+
+    access_token = current_user.google_access_token
+    if not access_token:
+        raise HTTPException(
+            status_code=403,
+            detail="Google Calendar access not granted. Please sign out and sign in with Google again to grant calendar permissions.",
+        )
+
+    feed = db.scalar(select(CalendarFeed).where(CalendarFeed.feed_hash == feed_hash))
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+
+    feed_url = f"{settings.api_base_url}/cal/{feed_hash}.ics"
+    webcal_url = feed_url.replace("http://", "webcal://").replace("https://", "webcal://")
+
+    # Use the Google Calendar API to subscribe to the webcal feed
+    async with _httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json={"id": webcal_url},
+        )
+
+        if r.status_code == 401:
+            # Token expired — user needs to re-authenticate
+            raise HTTPException(
+                status_code=403,
+                detail="Google access token expired. Please sign out and sign in with Google again.",
+            )
+        if r.status_code == 403:
+            raise HTTPException(
+                status_code=403,
+                detail="Calendar permission not granted. Please sign out and sign in with Google again to grant calendar permissions.",
+            )
+        if r.status_code not in (200, 201):
+            raise HTTPException(
+                status_code=502,
+                detail=f"Google Calendar API error: {r.status_code}",
+            )
+
+    return {"ok": True, "message": "Calendar added to your Google Calendar."}
+

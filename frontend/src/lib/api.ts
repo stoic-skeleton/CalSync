@@ -4,6 +4,7 @@ import type {
   Event,
   FeedCreationRequest,
   FeedCreationResponse,
+  MyFeed,
   PaginatedResponse,
   User,
   LoginResponse,
@@ -102,6 +103,14 @@ export function createFeed(body: FeedCreationRequest): Promise<FeedCreationRespo
     credentials: "include",
     body: JSON.stringify(body),
   });
+}
+
+export function fetchMyFeeds(): Promise<MyFeed[]> {
+  return apiFetch<MyFeed[]>("/api/feeds", { method: "GET", credentials: "include" });
+}
+
+export function addFeedToGoogle(feedHash: string): Promise<{ ok: boolean; message: string }> {
+  return apiFetch(`/api/feeds/${feedHash}/add-to-google`, { method: "POST", credentials: "include" });
 }
 
 // ── Auth ───────────────────────────────────────────────────────────────────

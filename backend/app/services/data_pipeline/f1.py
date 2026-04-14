@@ -16,6 +16,30 @@ YEAR = 2026
 # Only these session types are surfaced as calendar events
 SESSION_TYPES = {"Practice", "Qualifying", "Sprint", "Sprint Qualifying", "Race"}
 
+# ESPN's racing/f1 teams endpoint returns `"logos": []` for all constructors.
+# TheSportsDB provides current-season badges (verified April 2026).
+_F1_TEAM_LOGOS: dict[str, str] = {
+    "alpine":        "https://r2.thesportsdb.com/images/media/team/badge/ozhoj31740774899.png",
+    "aston martin":  "https://r2.thesportsdb.com/images/media/team/badge/ez5rl11740774066.png",
+    "audi":          "https://www.thesportsdb.com/images/media/team/badge/3uce6h1773158180.png",
+    "cadillac":      "https://r2.thesportsdb.com/images/media/team/badge/2wqnjo1769429652.png",
+    "ferrari":       "https://r2.thesportsdb.com/images/media/team/badge/rxwsqv1420417429.png",
+    "haas":          "https://r2.thesportsdb.com/images/media/team/badge/9p3s51740773680.png",
+    "mclaren":       "https://r2.thesportsdb.com/images/media/team/badge/kzqi7v1743602056.png",
+    "mercedes":      "https://r2.thesportsdb.com/images/media/team/badge/6caw0r1744037679.png",
+    "racing bulls":  "https://r2.thesportsdb.com/images/media/team/badge/ot7pjx1740775883.png",
+    "red bull":      "https://r2.thesportsdb.com/images/media/team/badge/nhlev81679826274.png",
+    "williams":      "https://r2.thesportsdb.com/images/media/team/badge/fp1cil1740776050.png",
+}
+
+
+def _f1_logo_for(display_name: str) -> str | None:
+    name = display_name.lower()
+    for key, url in _F1_TEAM_LOGOS.items():
+        if key in name:
+            return url
+    return None
+
 
 async def _get_with_retry(url: str, timeout: float = 20.0, retries: int = 4) -> httpx.Response:
     """GET with exponential backoff — handles transient DNS failures at container startup."""
@@ -46,7 +70,11 @@ class F1Adapter(SportAdapter):
                     external_id=t["team"]["id"],
                     name=t["team"].get("displayName", t["team"].get("name", "")),
                     short_name=t["team"].get("abbreviation"),
-                    logo_url=(t["team"].get("logos") or [{}])[0].get("href"),
+                    logo_url=(
+                        (t["team"].get("logos") or [{}])[0].get("href")
+                        or _f1_logo_for(t["team"].get("displayName", t["team"].get("name", "")))
+                    ),
+                    primary_color=f"#{t['team']['color']}" if t["team"].get("color") else None,
                 )
                 for t in teams_data
             ]

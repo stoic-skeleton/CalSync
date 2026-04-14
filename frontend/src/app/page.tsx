@@ -119,17 +119,6 @@ export default function HomePage() {
           }}
         />
         <div className="mx-auto max-w-3xl">
-          <span
-            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-6"
-            style={{
-              background: "var(--accent-muted)",
-              color: "var(--accent)",
-              border: "1px solid var(--accent-muted)",
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-            Free · No account needed · Works everywhere
-          </span>
           <h1
             className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight mb-5"
             style={{ color: "var(--foreground)" }}

@@ -99,6 +99,19 @@ class FeedCreateResponse(BaseModel):
     event_count: int
 
 
+class UserFeedOut(BaseModel):
+    """A feed belonging to the current user, enriched for display."""
+    model_config = ConfigDict(from_attributes=True)
+    feed_hash: str
+    feed_url: str
+    webcal_url: str
+    event_count: int
+    league_ids: list[int]
+    team_ids: list[int]
+    reminder_minutes: int | None
+    created_at: datetime
+
+
 # ── Auth / Users ─────────────────────────────────────────────────────────
 
 class UserOut(BaseModel):
@@ -107,6 +120,7 @@ class UserOut(BaseModel):
     email: str
     name: str | None
     picture_url: str | None
+    google_id: str | None
     tier: str
     is_active: bool
     created_at: datetime

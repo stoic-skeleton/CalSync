@@ -35,7 +35,8 @@ function LoginForm() {
   }
 
   function goGoogle() {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/auth/google`;
+    const nextParam = next !== "/" ? `?next=${encodeURIComponent(next)}` : "";
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/auth/google${nextParam}`;
   }
 
   return (

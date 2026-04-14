@@ -10,7 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.data_pipeline.f1 import F1Adapter
 from app.services.data_pipeline.ipl import IPLAdapter
-from app.services.data_pipeline.espn import NFLAdapter, NBAAdapter, MLSAdapter
+from app.services.data_pipeline.espn import NFLAdapter, NBAAdapter, MLSAdapter, FIFAWorldCupAdapter
 from app.services.data_pipeline.icc import ICCMensT20Adapter, ICCWomensT20Adapter
 from app.services.ingest import ingest_league
 
@@ -25,6 +25,7 @@ def _build_adapters():
         NFLAdapter(),
         NBAAdapter(),
         MLSAdapter(),
+        FIFAWorldCupAdapter(),
         ICCMensT20Adapter(),
         ICCWomensT20Adapter(),
     ]

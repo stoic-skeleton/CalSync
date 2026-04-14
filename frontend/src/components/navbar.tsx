@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
-import { Menu, X, CalendarDays, LogOut, User, ChevronDown, ShieldCheck } from "lucide-react";
+import { Menu, X, CalendarDays, LogOut, User, ChevronDown, ShieldCheck, CalendarCheck } from "lucide-react";
 import ThemeToggle from "./theme-toggle";
 import { useAuth } from "./auth-provider";
 
@@ -119,6 +119,16 @@ function UserMenu() {
               Admin dashboard
             </Link>
           )}
+
+          {/* My Calendars */}
+          <Link
+            href="/my-calendars"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-colors"
+          >
+            <CalendarCheck size={15} className="text-[var(--muted)]" />
+            My Calendars
+          </Link>
 
           {/* Profile */}
           <Link

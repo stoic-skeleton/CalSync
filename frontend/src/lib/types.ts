@@ -63,6 +63,17 @@ export interface FeedCreationResponse {
   event_count: number;
 }
 
+export interface MyFeed {
+  feed_hash: string;
+  feed_url: string;
+  webcal_url: string;
+  event_count: number;
+  league_ids: number[];
+  team_ids: number[];
+  reminder_minutes: number | null;
+  created_at: string;
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
@@ -87,6 +98,7 @@ export interface User {
   email: string;
   name?: string | null;
   picture_url?: string | null;
+  google_id?: string | null;
   tier: string;
   is_active: boolean;
   created_at: string;

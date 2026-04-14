@@ -115,6 +115,8 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String(150))
     picture_url: Mapped[str | None] = mapped_column(Text)
     google_id: Mapped[str | None] = mapped_column(String(200), unique=True)
+    google_access_token: Mapped[str | None] = mapped_column(Text)
+    google_refresh_token: Mapped[str | None] = mapped_column(Text)
     hashed_password: Mapped[str | None] = mapped_column(String(200))
     tier: Mapped[str] = mapped_column(String(20), default="freemium", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

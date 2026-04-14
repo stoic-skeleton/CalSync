@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CalendarDays, Loader2, ArrowLeft, LogIn } from "lucide-react";
-import { createFeed } from "@/lib/api";
+import { createFeed, fetchMyFeeds } from "@/lib/api";
 import CalendarLinkModal from "@/components/calendar-link-modal";
 import type { FeedCreationResponse, League } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
@@ -15,6 +15,7 @@ const PLACEHOLDER_LEAGUES: League[] = [
   { id: 3, name: "NFL",       slug: "nfl",       sport_type: "american_football", country: "USA",           logo_url: null, event_count: 272 },
   { id: 4, name: "NBA",       slug: "nba",       sport_type: "basketball",        country: "USA",           logo_url: null, event_count: 1230 },
   { id: 5, name: "MLS",       slug: "mls",       sport_type: "soccer",            country: "USA/Canada",    logo_url: null, event_count: 378 },
+  { id: 6, name: "FIFA World Cup", slug: "fifa-world-cup", sport_type: "soccer", country: "International", logo_url: null, event_count: 104 },
 ];
 
 const SPORT_EMOJI: Record<string, string> = {
@@ -45,8 +46,26 @@ function BuildPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [reminderMinutes, setReminderMinutes] = useState<number | null>(null);
 
-  // No auto-generate on mount — we always show the reminder selector first
-  // so users can choose a reminder before creating the feed.
+  // When user is logged in and has selections, check if they already have a feed
+  // for this exact selection — if so, open the modal immediately (skip Generate step).
+  useEffect(() => {
+    if (!user || feed || !leagueIds.length) return;
+    fetchMyFeeds()
+      .then((myFeeds) => {
+        const sorted = (ids: number[]) => [...ids].sort((a, b) => a - b).join(",");
+        const match = myFeeds.find(
+          (f) =>
+            sorted(f.league_ids) === sorted(leagueIds) &&
+            sorted(f.team_ids) === sorted(teamIds)
+        );
+        if (match) {
+          setFeed({ feed_hash: match.feed_hash, feed_url: match.feed_url, webcal_url: match.webcal_url, event_count: match.event_count });
+          if (match.reminder_minutes) setReminderMinutes(match.reminder_minutes);
+        }
+      })
+      .catch(() => { /* ignore — user can still click Generate */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -160,11 +179,27 @@ function BuildPageInner() {
                   Sign in to generate your calendar link. It&apos;s free.
                 </p>
                 <button
+                  onClick={() => {
+                    const next = encodeURIComponent(`/get-calendar?${searchParams?.toString() ?? ""}`);
+                    window.location.href = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/auth/google?next=${next}`;
+                  }}
+                  className="mb-3 w-full inline-flex items-center justify-center gap-3 px-6 py-3 rounded-xl font-bold text-sm border transition-all hover:border-[var(--accent)]"
+                  style={{ background: "var(--surface-hover)", border: "1px solid var(--border)", color: "var(--foreground)" }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18">
+                    <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.85l6.09-6.09C34.46 3.09 29.5 1 24 1 14.82 1 7.07 6.48 3.64 14.22l7.08 5.5C12.4 13.67 17.73 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.52 24.5c0-1.64-.15-3.22-.42-4.75H24v9h12.7c-.55 2.99-2.22 5.52-4.73 7.22l7.25 5.63C43.44 37.42 46.52 31.4 46.52 24.5z"/>
+                    <path fill="#FBBC05" d="M10.72 28.28A14.6 14.6 0 0 1 9.5 24c0-1.48.25-2.91.72-4.28l-7.08-5.5A23.94 23.94 0 0 0 0 24c0 3.87.93 7.52 2.56 10.75l8.16-6.47z"/>
+                    <path fill="#34A853" d="M24 47c5.5 0 10.12-1.82 13.49-4.94l-7.25-5.63c-1.81 1.21-4.13 1.93-6.24 1.93-6.27 0-11.6-4.17-13.28-9.72l-8.16 6.47C7.07 41.52 14.82 47 24 47z"/>
+                  </svg>
+                  Continue with Google
+                </button>
+                <button
                   onClick={() => router.push(`/login?next=/get-calendar?${searchParams?.toString() ?? ""}`)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm w-full justify-center"
                   style={{ background: "var(--accent)" }}
                 >
-                  <LogIn size={16} /> Sign in to continue
+                  <LogIn size={16} /> Sign in with email
                 </button>
                 <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
                   No account?{" "}

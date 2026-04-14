@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, ExternalLink } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 const LINKS = [
   { group: "Product", items: [
@@ -7,13 +7,6 @@ const LINKS = [
     { label: "Upcoming Schedule", href: "/schedule" },
     { label: "Pricing", href: "/pricing" },
     { label: "Get Calendar Link", href: "/get-calendar" },
-  ]},
-  { group: "Sports", items: [
-    { label: "Formula 1", href: "/browse?sport=motorsport" },
-    { label: "IPL", href: "/browse?sport=cricket" },
-    { label: "NFL", href: "/browse?sport=american_football" },
-    { label: "NBA", href: "/browse?sport=basketball" },
-    { label: "MLS", href: "/browse?sport=soccer" },
   ]},
   { group: "About", items: [
     { label: "About CalSync", href: "/#how-it-works" },
@@ -28,7 +21,7 @@ export default function Footer() {
       style={{ borderColor: "var(--border)", background: "var(--surface)" }}
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg mb-3">
@@ -40,15 +33,6 @@ export default function Footer() {
             <p className="text-sm" style={{ color: "var(--muted)" }}>
               Never miss a game again. Sports schedules, synced to your calendar.
             </p>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-4 text-sm hover:text-[var(--foreground)] transition-colors"
-              style={{ color: "var(--muted)" }}
-            >
-              <ExternalLink size={15} /> Open Source on GitHub
-            </a>
           </div>
 
           {/* Link groups */}
@@ -81,7 +65,7 @@ export default function Footer() {
           className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs"
           style={{ borderTop: "1px solid var(--border)", color: "var(--muted)" }}
         >
-          <span>© {new Date().getFullYear()} CalSync. Free and open source.</span>
+          <span>© {new Date().getFullYear()} CalSync.</span>
           <span>Built with ❤️ for sports fans</span>
         </div>
       </div>
