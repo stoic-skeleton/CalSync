@@ -106,7 +106,7 @@ export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventC
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-lg rounded-2xl p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
       >
         {/* Close */}

@@ -147,7 +147,7 @@ export default function SchedulePage() {
               All upcoming events across every league, in your local timezone.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {/* View toggle */}
             <div
               className="flex rounded-lg border p-0.5 gap-0.5"

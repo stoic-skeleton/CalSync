@@ -264,6 +264,22 @@ export default function Navbar() {
                     Admin dashboard
                   </Link>
                 )}
+                <Link
+                  href="/my-calendars"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+                >
+                  <CalendarCheck size={15} className="text-[var(--muted)]" />
+                  My Calendars
+                </Link>
+                <Link
+                  href="/profile"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-hover)]"
+                >
+                  <User size={15} className="text-[var(--muted)]" />
+                  Profile
+                </Link>
                 <button
                   onClick={handleMobileLogout}
                   className="w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium hover:bg-[var(--surface-hover)]"

@@ -138,11 +138,11 @@ export default function MyCalendarsPage() {
                 </div>
 
                 {/* Stats row */}
-                <div className="flex items-center gap-4 mb-4 text-xs" style={{ color: "var(--muted)" }}>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: "var(--muted)" }}>
                   <span>{feed.event_count} upcoming events</span>
-                  <span>·</span>
+                  <span className="hidden sm:inline">·</span>
                   <span>{reminderLabel(feed.reminder_minutes)}</span>
-                  <span>·</span>
+                  <span className="hidden sm:inline">·</span>
                   <span>Created {new Date(feed.created_at).toLocaleDateString()}</span>
                 </div>
 
