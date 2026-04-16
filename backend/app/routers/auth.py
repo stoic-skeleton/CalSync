@@ -51,8 +51,8 @@ def login(payload: UserLogin, response: Response, db: Session = Depends(get_db))
     # Return token in body so mobile clients (iOS Safari ITP) can use Authorization header
     return LoginOut(
         id=user.id, email=user.email, name=user.name, picture_url=user.picture_url,
-        tier=user.tier, is_active=user.is_active, created_at=user.created_at,
-        access_token=token,
+        google_id=user.google_id, tier=user.tier, is_active=user.is_active,
+        created_at=user.created_at, access_token=token,
     )
 
 

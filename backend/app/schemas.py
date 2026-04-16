@@ -123,7 +123,7 @@ class UserOut(BaseModel):
     email: str
     name: str | None
     picture_url: str | None
-    google_id: str | None
+    google_id: str | None = None
     tier: str
     is_active: bool
     created_at: datetime
