@@ -13,7 +13,7 @@ def build_ics(events: list[Event], feed_hash: str, reminder_minutes: int | None 
     cal.add("VERSION", "2.0")
     cal.add("CALSCALE", "GREGORIAN")
     cal.add("METHOD", "PUBLISH")
-    cal.add("X-WR-CALNAME", "CalSync — Sports Schedule")
+    cal.add("X-WR-CALNAME", "CalSync")
     cal.add("X-WR-CALDESC", "Auto-updating sports calendar from CalSync (calsync.dev)")
     cal.add("X-WR-TIMEZONE", "UTC")
     cal.add("REFRESH-INTERVAL;VALUE=DURATION", "PT30M")

@@ -199,6 +199,25 @@ If a league is missing, check:
 
 ---
 
+### ❌ `POST /api/auth/login` returns 500 — `ValidationError: google_id Field required`
+
+**Symptom:** Login endpoint returns HTTP 500 with a Pydantic `ValidationError`:
+```
+pydantic_core._pydantic_core.ValidationError: 1 validation error for LoginOut
+google_id
+  Field required [type=missing, ...]
+```
+
+**Cause:** `UserOut.google_id` was declared as `str | None` without a default value. In Pydantic v2 this still makes the field **required**. The `login` endpoint manually constructs `LoginOut(...)` and omitted `google_id`, causing the validation error for all password-auth users (who never have a `google_id`).
+
+**Fix:**
+1. `backend/app/schemas.py` — Changed `google_id: str | None` → `google_id: str | None = None`.
+2. `backend/app/routers/auth.py` — Added `google_id=user.google_id` to the `LoginOut(...)` constructor.
+
+**Rule:** Any `| None` field that may not be set for all user types must have `= None` as its default in the Pydantic schema.
+
+---
+
 ## Docker / Infrastructure
 
 ### ❌ Old stale data after code changes
