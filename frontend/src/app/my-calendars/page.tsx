@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Loader2, ExternalLink } from "lucide-react";
-import { fetchMyFeeds, fetchLeagues } from "@/lib/api";
+import { CalendarDays, Loader2, ExternalLink, Trash2 } from "lucide-react";
+import { fetchMyFeeds, fetchLeagues, deleteFeed } from "@/lib/api";
 import CalendarLinkModal from "@/components/calendar-link-modal";
 import { useAuth } from "@/components/auth-provider";
 import type { MyFeed, League } from "@/lib/types";
@@ -16,11 +16,6 @@ const SPORT_EMOJI: Record<string, string> = {
   soccer: "⚽",
 };
 
-function reminderLabel(minutes: number | null) {
-  if (!minutes) return "No reminder";
-  if (minutes === 60) return "1h before";
-  return `${minutes}m before`;
-}
 
 export default function MyCalendarsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -30,6 +25,8 @@ export default function MyCalendarsPage() {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFeed, setActiveFeed] = useState<MyFeed | null>(null);
+  const [deletingHash, setDeletingHash] = useState<string | null>(null);
+  const [confirmDeleteHash, setConfirmDeleteHash] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -53,6 +50,33 @@ export default function MyCalendarsPage() {
 
   function openModal(feed: MyFeed) {
     setActiveFeed(feed);
+  }
+
+  async function handleDelete(feedHash: string) {
+    setDeletingHash(feedHash);
+    try {
+      await deleteFeed(feedHash);
+      setFeeds((prev) => prev.filter((f) => f.feed_hash !== feedHash));
+    } catch {
+      // ignore — feed stays in list
+    } finally {
+      setDeletingHash(null);
+      setConfirmDeleteHash(null);
+    }
+  }
+
+  function formatLastAccessed(iso: string | null) {
+    if (!iso) return null;
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMin = Math.round((now.getTime() - d.getTime()) / 60000);
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return `${diffH}h ago`;
+    const diffD = Math.round(diffH / 24);
+    if (diffD < 7) return `${diffD}d ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
   if (authLoading || loading) {
@@ -140,20 +164,55 @@ export default function MyCalendarsPage() {
                 {/* Stats row */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: "var(--muted)" }}>
                   <span>{feed.event_count} upcoming events</span>
-                  <span className="hidden sm:inline">·</span>
-                  <span>{reminderLabel(feed.reminder_minutes)}</span>
+                  {feed.last_accessed_at && (
+                    <>
+                      <span className="hidden sm:inline">·</span>
+                      <span>Last fetched {formatLastAccessed(feed.last_accessed_at)}</span>
+                    </>
+                  )}
                   <span className="hidden sm:inline">·</span>
                   <span>Created {new Date(feed.created_at).toLocaleDateString()}</span>
                 </div>
 
-                {/* Action */}
-                <button
-                  onClick={() => openModal(feed)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-                  style={{ background: "var(--accent)" }}
-                >
-                  <ExternalLink size={14} /> Subscribe
-                </button>
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openModal(feed)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    <ExternalLink size={14} /> Manage
+                  </button>
+                  {confirmDeleteHash === feed.feed_hash ? (
+                    <>
+                      <span className="text-xs" style={{ color: "var(--muted)" }}>Delete this feed?</span>
+                      <button
+                        onClick={() => handleDelete(feed.feed_hash)}
+                        disabled={deletingHash === feed.feed_hash}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-white transition-all"
+                        style={{ background: "var(--danger, #ef4444)" }}
+                      >
+                        {deletingHash === feed.feed_hash ? <Loader2 size={13} className="animate-spin" /> : "Yes, delete"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteHash(null)}
+                        className="px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-[var(--surface-hover)]"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteHash(feed.feed_hash)}
+                      className="p-2 rounded-xl transition-all hover:bg-[var(--surface-hover)]"
+                      style={{ color: "var(--muted)" }}
+                      aria-label="Delete feed"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

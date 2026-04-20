@@ -113,6 +113,10 @@ export function addFeedToGoogle(feedHash: string): Promise<{ ok: boolean; messag
   return apiFetch(`/api/feeds/${feedHash}/add-to-google`, { method: "POST", credentials: "include" });
 }
 
+export function deleteFeed(feedHash: string): Promise<void> {
+  return apiFetch(`/api/feeds/${feedHash}`, { method: "DELETE", credentials: "include" });
+}
+
 // ── Auth ───────────────────────────────────────────────────────────────────
 
 export type RegisterPayload = { email: string; password: string; name?: string };

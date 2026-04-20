@@ -149,9 +149,32 @@ def list_my_feeds(
             google_calendar_id=f.google_calendar_id,
             last_synced_at=f.last_synced_at,
             last_synced_event_count=f.last_synced_event_count,
+            last_accessed_at=f.last_accessed_at,
             created_at=f.created_at,
         ))
     return result
+
+
+@router.delete("/api/feeds/{feed_hash}", status_code=204)
+def delete_feed(
+    feed_hash: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a calendar feed owned by the authenticated user."""
+    feed = db.scalar(select(CalendarFeed).where(CalendarFeed.feed_hash == feed_hash))
+    if not feed:
+        raise HTTPException(status_code=404, detail="Feed not found")
+    if feed.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your feed")
+    # Evict from Redis cache if available
+    if _redis:
+        try:
+            _redis.delete(f"feed:{feed_hash}")
+        except Exception:
+            pass
+    db.delete(feed)
+    db.commit()
 
 
 @router.get("/cal/{feed_hash}.ics")

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   X,
   Copy,
   Check,
   CalendarDays,
   ExternalLink,
-  Smartphone,
   Loader2,
 } from "lucide-react";
 import { cn, copyToClipboard, toGoogleCalendarUrl, toOutlookUrl, toWebcalUrl } from "@/lib/utils";
@@ -22,42 +22,50 @@ interface CalendarLinkModalProps {
   onClose: () => void;
 }
 
-const PLATFORMS = [
+// All platforms — Google is filtered out for canDirectAdd users (it's handled by
+// the primary direct-add button). Apple is labelled for Android users (P17).
+const ALL_PLATFORMS = [
   {
     id: "google",
     label: "Google Calendar",
     icon: "🗓️",
     getUrl: (feed: FeedCreationResponse) => toGoogleCalendarUrl(feed.feed_url),
-    hintDefault: "Opens Google Calendar — click Add to subscribe",
-    hintAndroid: "Opens in your browser — tap Add to subscribe (syncs to app)",
+    hint: "Opens Google Calendar — click Add to subscribe",
+    hintAndroid: "Opens in your browser — tap Add to subscribe",
   },
   {
     id: "apple",
     label: "Apple Calendar",
     icon: "🍎",
     getUrl: (feed: FeedCreationResponse) => toWebcalUrl(feed.feed_url),
-    hintDefault: "Opens Apple Calendar subscription dialog on Mac/iPhone",
-    hintAndroid: "Opens Apple Calendar subscription dialog on Mac/iPhone",
+    hint: "Opens Apple Calendar subscription dialog on Mac/iPhone",
+    hintAndroid: "Mac & iPhone only — opens subscription dialog",
   },
   {
     id: "outlook",
     label: "Outlook",
     icon: "📧",
     getUrl: (feed: FeedCreationResponse) => toOutlookUrl(feed.feed_url),
-    hintDefault: "Opens Outlook.com calendar — click Subscribe",
+    hint: "Opens Outlook.com calendar — click Subscribe",
     hintAndroid: "Opens Outlook.com calendar — click Subscribe",
   },
 ];
 
 export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventCount, onClose }: CalendarLinkModalProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [showCopySection, setShowCopySection] = useState(false);
   const [directAdding, setDirectAdding] = useState(false);
   const [directResult, setDirectResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [syncedAt, setSyncedAt] = useState<string | null>(lastSyncedAt ?? null);
   const [syncedCount, setSyncedCount] = useState<number | null>(lastSyncedEventCount ?? null);
   const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
   const canDirectAdd = !!(user?.google_id);
+
+  // P13/P14: For Google-OAuth users the direct-add button covers Google Calendar,
+  // so hide it from the platform list to avoid duplication.
+  const platforms = ALL_PLATFORMS.filter((p) => !(canDirectAdd && p.id === "google"));
 
   function formatSyncTime(iso: string) {
     const d = new Date(iso);
@@ -79,16 +87,18 @@ export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventC
   }
 
   async function handleDirectAdd() {
+    // P15: don't show optimistic success — wait for actual API response
     setDirectAdding(true);
     setDirectResult(null);
     try {
       const res = await addFeedToGoogle(feed.feed_hash);
-      setDirectResult(res);
       if (res.ok) {
         if (res.last_synced_at) setSyncedAt(res.last_synced_at);
         if (res.last_synced_event_count != null) setSyncedCount(res.last_synced_event_count);
-        // Auto-dismiss success after 4s so button reappears for re-sync
-        setTimeout(() => setDirectResult(null), 4000);
+        setDirectResult({ ok: true, message: "Added! Your CalSync calendar will appear in Google Calendar within a few seconds." });
+        setTimeout(() => setDirectResult(null), 5000);
+      } else {
+        setDirectResult({ ok: false, message: res.message });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -119,7 +129,7 @@ export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventC
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-5">
+        <div className="flex items-center gap-3 mb-6">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{ background: "var(--accent-muted)" }}
@@ -128,46 +138,17 @@ export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventC
           </div>
           <div>
             <h2 className="font-bold text-lg" style={{ color: "var(--foreground)" }}>
-              Your Calendar Feed
+              Add to Your Calendar
             </h2>
             <p className="text-sm" style={{ color: "var(--muted)" }}>
-              {feed.event_count} events · auto-updates
+              {feed.event_count} events · auto-updates when schedules change
             </p>
           </div>
         </div>
 
-        {/* Feed URL */}
-        <div
-          className="flex items-center gap-2 rounded-xl p-3 mb-5"
-          style={{ background: "var(--surface-hover)", border: "1px solid var(--border)" }}
-        >
-          <code
-            className="flex-1 text-xs truncate font-mono"
-            style={{ color: "var(--foreground)" }}
-          >
-            {feed.feed_url}
-          </code>
-          <button
-            onClick={handleCopy}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
-              copied
-                ? "bg-green-500/15 text-green-400"
-                : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-            )}
-          >
-            {copied ? (
-              <><Check size={13} /> Copied</>
-            ) : (
-              <><Copy size={13} /> Copy</>
-            )}
-          </button>
-        </div>
-
-        {/* Direct Google Calendar add — only for Google-signed-in users */}
+        {/* SECTION 1: Direct Google add — primary CTA for Google-OAuth users (P13/P14) */}
         {canDirectAdd && (
           <div className="mb-5">
-            {/* Last synced info */}
             {syncedAt && !directResult && (
               <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>
                 Last synced {formatSyncTime(syncedAt)}
@@ -215,75 +196,97 @@ export default function CalendarLinkModal({ feed, lastSyncedAt, lastSyncedEventC
           </div>
         )}
 
-        {/* Platform buttons */}
+        {/* SECTION 2: Platform buttons (P13 — shown first; P17 — Apple labelled on Android) */}
         <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--muted)" }}>
-          Add to your calendar
+          {canDirectAdd ? "Also works with" : "Add to your calendar"}
         </p>
         <div className="flex flex-col gap-2 mb-5">
-          {PLATFORMS.map((p) => (
-            <div key={p.id}>
+          {platforms.map((p) => {
+            const isAppleOnAndroid = isAndroid && p.id === "apple";
+            return (
               <a
+                key={p.id}
                 href={p.getUrl(feed)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] group"
-                style={{ borderColor: "var(--border)" }}
+                style={{ borderColor: "var(--border)", opacity: isAppleOnAndroid ? 0.55 : 1 }}
               >
                 <span className="text-xl w-7 flex-shrink-0 text-center">{p.icon}</span>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{p.label}</p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+                    {p.label}{isAppleOnAndroid ? " (Mac / iPhone)" : ""}
+                  </p>
                   <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-                    {isAndroid ? p.hintAndroid : p.hintDefault}
+                    {isAndroid ? p.hintAndroid : p.hint}
                   </p>
                 </div>
                 <ExternalLink size={14} style={{ color: "var(--muted)" }} className="group-hover:text-[var(--accent)] transition-colors" />
               </a>
-              {/* Android: secondary webcal:// link as fallback for native calendar apps */}
-              {isAndroid && p.id === "google" && (
-                <a
-                  href={toWebcalUrl(feed.feed_url)}
-                  className="flex items-center gap-2 px-4 py-2 text-xs rounded-xl border mt-1 transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]"
-                  style={{ borderColor: "var(--border)", color: "var(--muted)" }}
-                >
-                  <span>📅</span>
-                  <span>Or try direct subscribe (opens native calendar app)</span>
-                </a>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
-        {/* Localhost dev warning */}
-        {feed.feed_url.includes("localhost") && (
-          <div
-            className="flex items-start gap-2.5 rounded-xl p-3 text-xs mb-2"
-            style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "var(--foreground)" }}
-          >
-            <span className="text-base flex-shrink-0">⚠️</span>
-            <span>
-              <strong>Local dev:</strong> Google Calendar and Outlook subscribe via their servers, so they
-              can&apos;t reach <code>localhost</code>. Use <strong>Apple Calendar</strong> (webcal opens on your device)
-              or copy the URL and import manually. To test Google Calendar, expose port 8000 with{" "}
-              <strong>ngrok</strong>.
-            </span>
-          </div>
-        )}
-        {/* Mobile QR note */}
-        <div
-          className="flex items-start gap-2.5 rounded-xl p-3 text-xs"
-          style={{ background: "var(--accent-muted)", color: "var(--muted)" }}
+
+        {/* SECTION 3: Manual copy link — collapsed by default (P13 — demoted) */}
+        <button
+          onClick={() => setShowCopySection(!showCopySection)}
+          className="text-xs underline mb-3 block"
+          style={{ color: "var(--muted)" }}
         >
-          <Smartphone size={14} className="flex-shrink-0 mt-0.5" style={{ color: "var(--accent)" }} />
-          {isAndroid ? (
-            <span>
-              Tap <strong>Google Calendar</strong> above — it opens in your browser, tap <strong>Add</strong>, and the calendar will sync to your Google Calendar app.
-            </span>
-          ) : (
-            <span>
-              On iPhone, tap <strong>Apple Calendar</strong> to subscribe directly in the app.
-              On Android, tap <strong>Google Calendar</strong> — it opens in your browser, tap Add to subscribe.
-            </span>
-          )}
-        </div>
+          {showCopySection ? "Hide link" : "Copy link manually"}
+        </button>
+        {showCopySection && (
+          <>
+            <div
+              className="flex items-center gap-2 rounded-xl p-3 mb-3"
+              style={{ background: "var(--surface-hover)", border: "1px solid var(--border)" }}
+            >
+              <code
+                className="flex-1 text-xs truncate font-mono"
+                style={{ color: "var(--foreground)" }}
+              >
+                {feed.feed_url}
+              </code>
+              <button
+                onClick={handleCopy}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                  copied
+                    ? "bg-green-500/15 text-green-400"
+                    : "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
+                )}
+              >
+                {copied ? (
+                  <><Check size={13} /> Copied</>
+                ) : (
+                  <><Copy size={13} /> Copy</>
+                )}
+              </button>
+            </div>
+            {feed.feed_url.includes("localhost") && (
+              <div
+                className="flex items-start gap-2.5 rounded-xl p-3 text-xs mb-3"
+                style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)", color: "var(--foreground)" }}
+              >
+                <span className="text-base flex-shrink-0">⚠️</span>
+                <span>
+                  <strong>Local dev:</strong> Google Calendar and Outlook subscribe via their servers, so they
+                  can&apos;t reach <code>localhost</code>. Use <strong>Apple Calendar</strong> (webcal opens on your device)
+                  or copy the URL and import manually. Expose port 8000 with <strong>ngrok</strong> to test Google Calendar.
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* P16: Done CTA — closes modal and navigates to My Calendars */}
+        <button
+          onClick={() => { onClose(); router.push("/my-calendars"); }}
+          className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+          style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+        >
+          Done — View My Calendars →
+        </button>
       </div>
     </div>
   );

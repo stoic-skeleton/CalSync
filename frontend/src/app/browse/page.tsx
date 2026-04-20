@@ -46,13 +46,37 @@ export default function BrowsePage() {
   const [selectedLeagues, setSelectedLeagues] = useState<League[]>([]);
   const [selectedTeams, setSelectedTeams] = useState<Team[]>([]);
 
+  // P5: restore prior selection from sessionStorage (set when navigating to get-calendar)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("calsync_selection");
+      if (saved) {
+        const { leagueIds } = JSON.parse(saved) as { leagueIds: number[] };
+        sessionStorage.removeItem("calsync_selection");
+        // Store IDs to match against leagues once they load
+        if (leagueIds?.length) {
+          setPendingRestoreIds(leagueIds);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const [pendingRestoreIds, setPendingRestoreIds] = useState<number[]>([]);
+
   useEffect(() => {
     setLoading(true);
     fetchLeagues(sport || undefined)
-      .then(setLeagues)
+      .then((fetched) => {
+        setLeagues(fetched);
+        // P5: restore selections once leagues are loaded
+        if (pendingRestoreIds.length > 0) {
+          setSelectedLeagues(fetched.filter((l) => pendingRestoreIds.includes(l.id)));
+          setPendingRestoreIds([]);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [sport]);
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleExpandLeague = useCallback(async (league: League) => {
     if (expandedLeague?.id === league.id) {
@@ -95,6 +119,10 @@ export default function BrowsePage() {
   }
 
   function handleBuild() {
+    // P5: persist selection so Back navigation restores it
+    sessionStorage.setItem("calsync_selection", JSON.stringify({
+      leagueIds: selectedLeagues.map((l) => l.id),
+    }));
     const leagueIds = selectedLeagues.map((l) => l.id).join(",");
     const teamIds = selectedTeams.map((t) => t.id).join(",");
     const qs = new URLSearchParams();
@@ -151,8 +179,8 @@ export default function BrowsePage() {
           </p>
         </div>
 
-        {/* Freemium upgrade banner */}
-        {isFreemium && (
+        {/* P3: freemium info banner — only show after first selection to avoid premature friction */}
+        {isFreemium && totalSelected > 0 && (
           <div
             className="flex items-center justify-between gap-4 rounded-xl px-4 py-3 mb-6 text-sm"
             style={{ background: "var(--accent-muted)", border: "1px solid var(--accent)" }}

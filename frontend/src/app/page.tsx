@@ -145,18 +145,12 @@ export default function HomePage() {
               <CalendarDays size={18} />
               Browse Sports
             </Link>
-            <Link
-              href="/#how-it-works"
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-semibold transition-all hover:bg-[var(--surface-hover)]"
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                color: "var(--foreground)",
-              }}
-            >
-              How it works
-            </Link>
           </div>
+          <p className="mt-4 text-sm" style={{ color: "var(--muted)" }}>
+            <Link href="/#how-it-works" className="underline underline-offset-2 hover:opacity-80 transition-opacity">
+              How it works ↓
+            </Link>
+          </p>
 
           {/* Works with your calendars */}
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">

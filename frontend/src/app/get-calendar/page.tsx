@@ -3,20 +3,10 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CalendarDays, Loader2, ArrowLeft, LogIn } from "lucide-react";
-import { createFeed, fetchMyFeeds } from "@/lib/api";
+import { createFeed, fetchMyFeeds, fetchLeagues } from "@/lib/api";
 import CalendarLinkModal from "@/components/calendar-link-modal";
 import type { FeedCreationResponse, League } from "@/lib/types";
 import { useAuth } from "@/components/auth-provider";
-
-// Placeholder data matching browse page placeholders
-const PLACEHOLDER_LEAGUES: League[] = [
-  { id: 1, name: "Formula 1", slug: "formula-1", sport_type: "motorsport",        country: "International", logo_url: null, event_count: 24 },
-  { id: 2, name: "IPL",       slug: "ipl",       sport_type: "cricket",           country: "India",         logo_url: null, event_count: 74 },
-  { id: 3, name: "NFL",       slug: "nfl",       sport_type: "american_football", country: "USA",           logo_url: null, event_count: 272 },
-  { id: 4, name: "NBA",       slug: "nba",       sport_type: "basketball",        country: "USA",           logo_url: null, event_count: 1230 },
-  { id: 5, name: "MLS",       slug: "mls",       sport_type: "soccer",            country: "USA/Canada",    logo_url: null, event_count: 378 },
-  { id: 6, name: "FIFA World Cup", slug: "fifa-world-cup", sport_type: "soccer", country: "International", logo_url: null, event_count: 104 },
-];
 
 const SPORT_EMOJI: Record<string, string> = {
   motorsport: "🏎️", cricket: "🏏", american_football: "🏈", basketball: "🏀", soccer: "⚽",
@@ -37,14 +27,16 @@ function BuildPageInner() {
     .filter(Boolean)
     .map(Number);
 
-  const selectedLeagues = PLACEHOLDER_LEAGUES.filter((l) =>
-    leagueIds.includes(l.id)
-  );
+  // P8: fetch real leagues from API instead of using hardcoded placeholders
+  const [allLeagues, setAllLeagues] = useState<League[]>([]);
+  useEffect(() => {
+    fetchLeagues().then(setAllLeagues).catch(() => {});
+  }, []);
+  const selectedLeagues = allLeagues.filter((l) => leagueIds.includes(l.id));
 
   const [loading, setLoading] = useState(false);
   const [feed, setFeed] = useState<FeedCreationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reminderMinutes, setReminderMinutes] = useState<number | null>(null);
 
   // When user is logged in and has selections, check if they already have a feed
   // for this exact selection — if so, open the modal immediately (skip Generate step).
@@ -60,7 +52,6 @@ function BuildPageInner() {
         );
         if (match) {
           setFeed({ feed_hash: match.feed_hash, feed_url: match.feed_url, webcal_url: match.webcal_url, event_count: match.event_count });
-          if (match.reminder_minutes) setReminderMinutes(match.reminder_minutes);
         }
       })
       .catch(() => { /* ignore — user can still click Generate */ });
@@ -71,7 +62,7 @@ function BuildPageInner() {
     setLoading(true);
     setError(null);
     try {
-      const result = await createFeed({ league_ids: leagueIds, team_ids: teamIds, reminder_minutes: reminderMinutes });
+      const result = await createFeed({ league_ids: leagueIds, team_ids: teamIds });
       setFeed(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -132,15 +123,22 @@ function BuildPageInner() {
               Your selections
             </p>
             <div className="flex flex-wrap gap-2">
-              {selectedLeagues.map((l) => (
-                <span
-                  key={l.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium"
-                  style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
-                >
-                  {SPORT_EMOJI[l.sport_type]} {l.name}
-                </span>
-              ))}
+              {leagueIds.length > 0 && allLeagues.length === 0 ? (
+                // Loading skeleton for chips while leagues fetch
+                Array.from({ length: leagueIds.length }).map((_, i) => (
+                  <div key={i} className="h-7 w-24 rounded-full animate-pulse" style={{ background: "var(--surface-hover)" }} />
+                ))
+              ) : (
+                selectedLeagues.map((l) => (
+                  <span
+                    key={l.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium"
+                    style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+                  >
+                    {SPORT_EMOJI[l.sport_type]} {l.name}
+                  </span>
+                ))
+              )}
               {teamIds.length > 0 && (
                 <span
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium"
@@ -172,7 +170,12 @@ function BuildPageInner() {
         {/* Generate button / auth prompt */}
         {hasSelections && !feed && (
           <div className="text-center">
-            {!authLoading && !user ? (
+            {authLoading ? (
+              /* P12: show spinner while auth state resolves, not the sign-in prompt */
+              <div className="rounded-2xl p-6 border flex items-center justify-center" style={{ background: "var(--surface)", borderColor: "var(--border)", minHeight: 96 }}>
+                <Loader2 size={22} className="animate-spin" style={{ color: "var(--muted)" }} />
+              </div>
+            ) : !user ? (
               /* Not signed in — prompt to log in */
               <div className="rounded-2xl p-6 border" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
                 <p className="text-sm mb-4" style={{ color: "var(--muted)" }}>
@@ -195,7 +198,7 @@ function BuildPageInner() {
                   Continue with Google
                 </button>
                 <button
-                  onClick={() => router.push(`/login?next=/get-calendar?${searchParams?.toString() ?? ""}`)}
+                  onClick={() => router.push('/login?next=' + encodeURIComponent('/get-calendar?' + (searchParams?.toString() ?? "")))}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white text-sm w-full justify-center"
                   style={{ background: "var(--accent)" }}
                 >
@@ -204,7 +207,7 @@ function BuildPageInner() {
                 <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>
                   No account?{" "}
                   <button
-                    onClick={() => router.push(`/register?next=/get-calendar?${searchParams?.toString() ?? ""}`)}
+                    onClick={() => router.push('/register?next=' + encodeURIComponent('/get-calendar?' + (searchParams?.toString() ?? "")))}
                     className="underline"
                     style={{ color: "var(--accent)" }}
                   >
@@ -214,16 +217,6 @@ function BuildPageInner() {
               </div>
             ) : (
               <>
-                {/* Reminder selector */}
-                <div className="mb-4 flex items-center justify-center gap-3">
-                  <label className="text-sm" style={{ color: "var(--muted)" }}>Reminder:</label>
-                  <div className="inline-flex gap-2">
-                    <button onClick={() => setReminderMinutes(null)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===null?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>None</button>
-                    <button onClick={() => setReminderMinutes(15)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===15?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>15m</button>
-                    <button onClick={() => setReminderMinutes(30)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===30?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>30m</button>
-                    <button onClick={() => setReminderMinutes(60)} className={`px-3 py-1 rounded-xl text-sm ${reminderMinutes===60?"bg-[var(--accent)] text-white":"bg-[var(--surface)]"}`}>60m</button>
-                  </div>
-                </div>
                 <button
                   onClick={handleGenerate}
                   disabled={loading}

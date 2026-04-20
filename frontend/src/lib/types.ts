@@ -74,6 +74,7 @@ export interface MyFeed {
   google_calendar_id: string | null;
   last_synced_at: string | null;
   last_synced_event_count: number | null;
+  last_accessed_at: string | null;
   created_at: string;
 }
 

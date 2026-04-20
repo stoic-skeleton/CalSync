@@ -161,6 +161,10 @@ export default function Navbar() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
+  const visibleLinks = NAV_LINKS.filter(
+    (l) => l.href !== "/pricing" || !user || user.tier === "freemium"
+  );
+
   async function handleMobileLogout() {
     setOpen(false);
     await logout();
@@ -191,7 +195,7 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map((l) => (
+          {visibleLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -227,7 +231,7 @@ export default function Navbar() {
           className="md:hidden px-4 pb-4 flex flex-col gap-1"
           style={{ borderTop: "1px solid var(--border)" }}
         >
-          {NAV_LINKS.map((l) => (
+          {visibleLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
